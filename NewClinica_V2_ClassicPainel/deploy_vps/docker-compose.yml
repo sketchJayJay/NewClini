@@ -1,0 +1,42 @@
+services:
+  newclinica:
+    build:
+      context: ..
+      dockerfile: deploy_vps/Dockerfile
+    container_name: newclinica_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+    networks:
+      - web
+
+  nginx:
+    image: nginx:alpine
+    container_name: newclinica_nginx
+    restart: unless-stopped
+    depends_on:
+      - newclinica
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    networks:
+      - web
+
+  certbot:
+    image: certbot/certbot
+    container_name: newclinica_certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: /bin/sh -c
+    command: "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done"
+
+networks:
+  web:
+    driver: bridge

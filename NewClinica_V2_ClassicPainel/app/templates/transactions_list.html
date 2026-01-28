@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% set title = "Lançamentos" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Financeiro</h4>
+    <div class="text-muted small">Entradas, saídas e pendências</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('finance.transaction_new', kind='expense') }}">Nova saída</a>
+    <a class="btn btn-brand" href="{{ url_for('finance.transaction_new', kind='income') }}">Nova entrada</a>
+  </div>
+</div>
+
+<form class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" name="kind">
+          <option value="">Todos</option>
+          <option value="income" {% if filters.kind=="income" %}selected{% endif %}>Entradas</option>
+          <option value="expense" {% if filters.kind=="expense" %}selected{% endif %}>Saídas</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="status">
+          <option value="">Todos</option>
+          <option value="paid" {% if filters.status=="paid" %}selected{% endif %}>Pagos</option>
+          <option value="pending" {% if filters.status=="pending" %}selected{% endif %}>Pendentes</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Pagamento</label>
+        <select class="form-select" name="payment_method">
+          <option value="">Todos</option>
+          <option value="cash" {% if filters.payment_method=="cash" %}selected{% endif %}>Dinheiro</option>
+          <option value="pix" {% if filters.payment_method=="pix" %}selected{% endif %}>Pix</option>
+          <option value="card_credit" {% if filters.payment_method=="card_credit" %}selected{% endif %}>Cartão crédito</option>
+          <option value="card_debit" {% if filters.payment_method=="card_debit" %}selected{% endif %}>Cartão débito</option>
+          <option value="transfer" {% if filters.payment_method=="transfer" %}selected{% endif %}>Transferência</option>
+          <option value="other" {% if filters.payment_method=="other" %}selected{% endif %}>Outros</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">De</label>
+        <input class="form-control" type="date" name="from" value="{{ filters.date_from }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Até</label>
+        <input class="form-control" type="date" name="to" value="{{ filters.date_to }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Paciente</label>
+        <select class="form-select" name="patient_id">
+          <option value="">Todos</option>
+          {% for p in patients %}
+            <option value="{{ p.id }}" {% if filters.patient_id|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Categoria</label>
+        <select class="form-select" name="category_id">
+          <option value="">Todas</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" {% if filters.category_id|int == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Busca</label>
+        <input class="form-control" name="q" placeholder="Descrição..." value="{{ filters.q }}">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100">Filtrar</button>
+      </div>
+      <div class="col-md-2">
+        <a class="btn btn-light w-100" href="{{ url_for('finance.transactions') }}">Limpar</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Total entradas (filtro)</div>
+        <div class="kpi-value text-success">R$ {{ totals.income }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Total saídas (filtro)</div>
+        <div class="kpi-value text-danger">R$ {{ totals.expense }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Pendências (filtro)</div>
+        <div class="kpi-value">R$ {{ totals.pending }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-2">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas (Dinheiro)</div>
+        <div class="kpi-value">R$ {{ income_by_pm.cash }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas (Pix)</div>
+        <div class="kpi-value">R$ {{ income_by_pm.pix }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas (Crédito)</div>
+        <div class="kpi-value">R$ {{ income_by_pm.card_credit }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas (Débito)</div>
+        <div class="kpi-value">R$ {{ income_by_pm.card_debit }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas (Transf.)</div>
+        <div class="kpi-value">R$ {{ income_by_pm.transfer }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas (Outros)</div>
+        <div class="kpi-value">R$ {{ income_by_pm.other }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Status</th>
+          <th>Pagamento</th>
+          <th>Paciente</th>
+          <th>Categoria</th>
+          <th>Profissional</th>
+          <th>Descrição</th>
+          <th class="text-end">Valor</th>
+          <th style="width: 250px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.date }}</td>
+          <td>
+            {% if r.kind=="income" %}
+              <span class="badge bg-success-subtle text-success">Entrada</span>
+            {% else %}
+              <span class="badge bg-danger-subtle text-danger">Saída</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.status=="paid" %}
+              <span class="badge bg-success">Pago</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Pendente</span>
+            {% endif %}
+          </td>
+          <td>{{ pm_labels.get(r.payment_method, r.payment_method) }}</td>
+          <td>{{ r.patient_name or "—" }}</td>
+          <td>{{ r.category_name or "—" }}</td>
+          <td>{{ r.provider_name or "—" }}</td>
+          <td class="text-muted">{{ r.description or "" }}</td>
+          <td class="text-end">R$ {{ cents_to_brl(r.amount_cents) }}</td>
+          <td class="text-end">
+            {% if r.status=="pending" %}
+              <form method="post" action="{{ url_for('finance.transaction_settle', tid=r.id) }}" class="d-inline">
+                <input type="hidden" name="date" value="{{ r.due_date or r.date }}">
+                <select class="form-select form-select-sm d-inline-block w-auto" name="payment_method">
+                  <option value="pix">Pix</option>
+                  <option value="cash">Dinheiro</option>
+                  <option value="card_credit">Cartão crédito</option>
+                  <option value="card_debit">Cartão débito</option>
+                  <option value="transfer">Transferência</option>
+                  <option value="other">Outro</option>
+                </select>
+                <button class="btn btn-sm btn-outline-success">Baixar</button>
+              </form>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('finance.transaction_edit', tid=r.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('finance.transaction_delete', tid=r.id) }}" class="d-inline" onsubmit="return confirm('Excluir lançamento?')">
+              <button class="btn btn-sm btn-outline-danger">Excluir</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="text-center text-muted py-4">Nenhum lançamento no filtro.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

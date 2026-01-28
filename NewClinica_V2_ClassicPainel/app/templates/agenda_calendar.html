@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% set title = "Agenda" %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<style>
+  .fc { background: #fff; border-radius: 16px; padding: 10px; border: 1px solid rgba(91,27,42,.12); box-shadow: 0 8px 24px rgba(0,0,0,.04); }
+  .fc .fc-toolbar-title{ font-size: 1.2rem; }
+  .fc .fc-button-primary{ background: var(--brand); border-color: var(--brand); }
+  .fc .fc-button-primary:hover{ background: var(--brand2); border-color: var(--brand2); }
+  .fc .fc-button-primary:disabled{ opacity:.55; }
+  .agenda-side{ position: sticky; top: 86px; }
+  .mini-hint{ font-size:.85rem; color:#6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Agenda</h4>
+    <div class="text-muted small">Calendário com arrastar e soltar (reagendar), clique para editar.</div>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <select id="providerFilter" class="form-select form-select-sm" style="max-width:260px">
+      <option value="">Todos os profissionais</option>
+      {% for pr in providers %}
+        <option value="{{ pr.id }}">{{ pr.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm btn-brand" id="btnNew">Novo agendamento</button>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div id="calendar"></div>
+    <div class="mini-hint mt-2">
+      Dica: arraste o evento para outro dia/horário. Você também pode <b>puxar a ponta</b> do evento para aumentar/diminuir a duração.
+    </div>
+  </div>
+
+  <div class="col-lg-3">
+    <div class="card border-0 shadow-sm agenda-side">
+      <div class="card-body">
+        <h6 class="mb-2">Criar rápido</h6>
+        <form method="post" action="{{ url_for('agenda.create_event') }}" class="vstack gap-2">
+          <div>
+            <label class="form-label small">Paciente</label>
+            <select name="patient_id" class="form-select" required>
+              <option value="">Selecione...</option>
+              {% for p in patients %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label small">Profissional</label>
+            <select name="provider_id" class="form-select">
+              <option value="">(Opcional)</option>
+              {% for pr in providers %}
+                <option value="{{ pr.id }}">{{ pr.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label small">Título</label>
+            <input class="form-control" name="title" value="Consulta">
+          </div>
+          <div>
+            <label class="form-label small">Início</label>
+            <input class="form-control" type="datetime-local" name="start_at" required>
+          </div>
+          <div>
+            <label class="form-label small">Fim</label>
+            <input class="form-control" type="datetime-local" name="end_at">
+          </div>
+          <div>
+            <label class="form-label small">Observação</label>
+            <textarea class="form-control" name="note" rows="2"></textarea>
+          </div>
+          <button class="btn btn-brand w-100">Salvar</button>
+        </form>
+        <hr>
+        <div class="mini-hint">
+          Clique em um evento para abrir o paciente e editar.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Novo / Editar -->
+<div class="modal fade" id="apptModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="apptForm" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title" id="apptTitle">Agendamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="apptId" value="">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Paciente</label>
+              <select id="patient_id" name="patient_id" class="form-select" required>
+                <option value="">Selecione...</option>
+                {% for p in patients %}
+                  <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Profissional</label>
+              <select id="provider_id" name="provider_id" class="form-select">
+                <option value="">(Opcional)</option>
+                {% for pr in providers %}
+                  <option value="{{ pr.id }}">{{ pr.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Título</label>
+              <input class="form-control" id="title" name="title" value="Consulta">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Início</label>
+              <input class="form-control" type="datetime-local" id="start_at" name="start_at" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fim</label>
+              <input class="form-control" type="datetime-local" id="end_at" name="end_at">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Observação</label>
+              <textarea class="form-control" id="note" name="note" rows="3"></textarea>
+            </div>
+
+            <div class="col-12">
+              <div class="alert alert-light border small mb-0" id="patientQuick" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <div class="d-flex gap-2">
+            <a id="openPatient" class="btn btn-outline-secondary" href="#" target="_blank" style="display:none;">Abrir paciente</a>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-danger" id="btnDelete" style="display:none;">Excluir</button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-brand">Salvar</button>
+          </div>
+        </div>
+      </form>
+      <form id="deleteForm" method="post" style="display:none;"></form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales-all.global.min.js"></script>
+<script>
+  const modalEl = document.getElementById('apptModal');
+  const modal = new bootstrap.Modal(modalEl);
+
+  const $ = (id) => document.getElementById(id);
+
+  function toLocalInput(iso){
+    if(!iso) return "";
+    // iso: YYYY-MM-DDTHH:MM:SS
+    return iso.slice(0,16);
+  }
+
+  async function post(url, data){
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body: new URLSearchParams(data)
+    });
+    if(!res.ok) throw new Error("Falha na requisição");
+    return await res.json();
+  }
+
+  let currentEventId = null;
+  let lastPatientId = null;
+
+  function openNew(startIso=null, endIso=null){
+    currentEventId = null;
+    $('apptTitle').textContent = "Novo agendamento";
+    $('apptId').value = "";
+    $('patient_id').value = "";
+    $('provider_id').value = "";
+    $('title').value = "Consulta";
+    $('start_at').value = startIso ? toLocalInput(startIso) : "";
+    $('end_at').value = endIso ? toLocalInput(endIso) : "";
+    $('note').value = "";
+    $('openPatient').style.display = "none";
+    $('patientQuick').style.display = "none";
+    $('btnDelete').style.display = "none";
+    modal.show();
+  }
+
+  function openEdit(ev){
+    currentEventId = ev.id;
+    const p = ev.extendedProps || {};
+    $('apptTitle').textContent = "Editar agendamento";
+    $('apptId').value = ev.id;
+    $('patient_id').value = p.patient_id || "";
+    $('provider_id').value = p.provider_id || "";
+    $('title').value = p.raw_title || "Consulta";
+    $('start_at').value = toLocalInput(ev.startStr);
+    $('end_at').value = toLocalInput(ev.endStr);
+    $('note').value = p.note || "";
+
+    lastPatientId = p.patient_id || null;
+    if(lastPatientId){
+      const url = "{{ url_for('patients.view_patient', pid=0) }}".replace("/0", "/" + lastPatientId);
+      $('openPatient').href = url;
+      $('openPatient').style.display = "inline-block";
+    }else{
+      $('openPatient').style.display = "none";
+    }
+
+    const info = [];
+    if(p.patient_name) info.push("<b>Paciente:</b> " + p.patient_name);
+    if(p.provider_name) info.push("<b>Profissional:</b> " + p.provider_name);
+    if(p.patient_phone) info.push("<b>Telefone:</b> " + p.patient_phone);
+    $('patientQuick').innerHTML = info.join(" • ");
+    $('patientQuick').style.display = info.length ? "block" : "none";
+
+    $('btnDelete').style.display = "inline-block";
+    modal.show();
+  }
+
+  $('btnNew').addEventListener('click', () => openNew());
+
+  // Delete button
+  $('btnDelete').addEventListener('click', () => {
+    if(!currentEventId) return;
+    if(!confirm("Excluir este agendamento?")) return;
+    const form = $('deleteForm');
+    form.action = "{{ url_for('agenda.delete_event', aid=0) }}".replace("/0/", "/" + currentEventId + "/");
+    form.submit();
+  });
+
+  // Submit (create or update)
+  $('apptForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      patient_id: $('patient_id').value,
+      provider_id: $('provider_id').value,
+      title: $('title').value,
+      start_at: $('start_at').value,
+      end_at: $('end_at').value,
+      note: $('note').value
+    };
+
+    try{
+      if(!currentEventId){
+        // create: fallback submit normal pra manter padrão do app
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "{{ url_for('agenda.create_event') }}";
+        for(const [k,v] of Object.entries(payload)){
+          const i = document.createElement("input");
+          i.type="hidden"; i.name=k; i.value=v;
+          form.appendChild(i);
+        }
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }else{
+        await post("{{ url_for('agenda.update_event', aid=0) }}".replace("/0", "/" + currentEventId), payload);
+        modal.hide();
+        calendar.refetchEvents();
+      }
+    }catch(err){
+      alert("Não consegui salvar. Tenta de novo.");
+      console.error(err);
+    }
+  });
+
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'timeGridWeek',
+    height: "auto",
+    nowIndicator: true,
+    editable: true,
+    selectable: true,
+    locale: 'pt-br',
+    buttonText: { today: 'Hoje', month: 'Mês', week: 'Semana', day: 'Dia', list: 'Lista' },
+    allDayText: 'Dia todo',
+    timeZone: 'local',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+    },
+    slotMinTime: "06:00:00",
+    slotMaxTime: "22:00:00",
+    eventSources: [{
+      events: function(fetchInfo, successCallback, failureCallback){
+        const providerId = document.getElementById("providerFilter").value;
+        const url = new URL("{{ url_for('agenda.events') }}", window.location.origin);
+        url.searchParams.set("start", fetchInfo.startStr);
+        url.searchParams.set("end", fetchInfo.endStr);
+        if(providerId) url.searchParams.set("provider_id", providerId);
+        fetch(url)
+          .then(r => r.json())
+          .then(successCallback)
+          .catch(failureCallback);
+      }
+    }],
+    select: function(info){
+      // seleção de intervalo
+      openNew(info.startStr, info.endStr);
+    },
+    dateClick: function(info){
+      // clique simples
+      openNew(info.dateStr + "T09:00:00", info.dateStr + "T09:30:00");
+    },
+    eventClick: function(info){
+      openEdit(info.event);
+    },
+    eventDrop: function(info){
+      post("{{ url_for('agenda.update_event', aid=0) }}".replace("/0", "/" + info.event.id), {
+        start_at: info.event.startStr,
+        end_at: info.event.endStr || ""
+      }).catch(() => {
+        info.revert();
+        alert("Não consegui reagendar. Tenta de novo.");
+      });
+    },
+    eventResize: function(info){
+      post("{{ url_for('agenda.update_event', aid=0) }}".replace("/0", "/" + info.event.id), {
+        start_at: info.event.startStr,
+        end_at: info.event.endStr || ""
+      }).catch(() => {
+        info.revert();
+        alert("Não consegui alterar a duração. Tenta de novo.");
+      });
+    }
+  });
+
+  calendar.render();
+
+  document.getElementById("providerFilter").addEventListener("change", () => {
+    calendar.refetchEvents();
+  });
+</script>
+{% endblock %}

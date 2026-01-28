@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% set title = patient.name %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">{{ patient.name }}</h4>
+    <div class="text-muted small">
+      {{ patient.phone or "Sem telefone" }}
+      · Nascimento: {{ patient.birth_date or "—" }}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('patients.list_patients') }}">Voltar</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('patients.edit_patient', pid=patient.id) }}">Editar</a>
+    <a class="btn btn-brand" href="{{ url_for('finance.transaction_new', patient_id=patient.id, kind='income') }}">Nova cobrança</a>
+  </div>
+</div>
+
+<ul class="nav nav-pills flex-wrap gap-2 mb-3">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='orcamentos' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='orcamentos') }}">Orçamentos</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='plano_ficha' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='plano_ficha') }}">Plano/Ficha</a>
+  </li>
+  <li class=\"nav-item\">
+    <a class=\"nav-link {{ 'active' if tab=='anamnese' else '' }}\" href=\"{{ url_for('patients.view_patient', pid=patient.id, tab='anamnese') }}\">Anamnese</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='agenda' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='agenda') }}">Agenda</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='odontograma' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='odontograma') }}">Odontograma</a>
+  </li>
+</ul>
+
+<!-- Resumo sempre visível (igual a versão antiga) -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h6 class="mb-2">Observações</h6>
+        <div class="text-muted">{{ patient.notes or "—" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h6 class="mb-3">Últimos lançamentos do paciente</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Categoria</th>
+                <th>Descrição</th>
+                <th class="text-end">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tx %}
+              <tr>
+                <td>{{ t.date }}</td>
+                <td>{{ "Entrada" if t.kind=="income" else "Saída" }}</td>
+                <td>
+                  {% if t.status=="paid" %}
+                    <span class="badge text-bg-success">Pago</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">Pendente</span>
+                  {% endif %}
+                </td>
+                <td>{{ t.category_name or "—" }}</td>
+                <td>{{ t.description or "" }}</td>
+                <td class="text-end">R$ {{ cents_to_brl(t.amount_cents) }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-center text-muted py-3">Sem lançamentos.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-2">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('finance.transactions', patient_id=patient.id) }}">Ver tudo no financeiro</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if tab=='orcamentos' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <h6 class="mb-3">Novo orçamento</h6>
+      <form method="post" action="{{ url_for('patients.budget_add', pid=patient.id) }}" class="row g-2">
+        <div class="col-lg-7">
+          <input class="form-control" name="description" placeholder="Descrição do procedimento" required>
+        </div>
+        <div class="col-lg-3">
+          <input class="form-control money" name="amount" placeholder="Valor (R$)" inputmode="decimal" required>
+        </div>
+        <div class="col-lg-2 d-grid">
+          <button class="btn btn-brand">Adicionar</button>
+        </div>
+      </form>
+      <div class="text-muted small mt-2">Ao <b>aprovar</b> um orçamento, ele entra automaticamente no <b>Plano</b>.</div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Descrição</th>
+            <th>Data</th>
+            <th class="text-end">Valor</th>
+            <th>Status</th>
+            <th style="width: 340px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in budgets %}
+          <tr>
+            <td>{{ b.description }}</td>
+            <td>{{ sql_to_br(b.created_at) }}</td>
+            <td class="text-end">R$ {{ cents_to_brl(b.amount_cents) }}</td>
+            <td>
+              {% if b.status=='aprovado' %}
+                <span class="badge text-bg-success">Aprovado</span>
+              {% elif b.status=='reprovado' %}
+                <span class="badge text-bg-danger">Reprovado</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Aberto</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('patients.budget_print', pid=patient.id, bid=b.id) }}">Imprimir</a>
+              {% if b.status != 'aprovado' %}
+                <a class="btn btn-sm btn-success" href="{{ url_for('patients.budget_status', pid=patient.id, bid=b.id, s='aprovado') }}">Aprovar</a>
+                <a class="btn btn-sm btn-outline-danger" href="{{ url_for('patients.budget_status', pid=patient.id, bid=b.id, s='reprovado') }}">Reprovar</a>
+              {% else %}
+                <span class="text-muted small ms-2">já aprovado</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">Nenhum orçamento.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% elif tab=='plano_ficha' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <h6 class="mb-1">Plano do paciente</h6>
+      <div class="text-muted small">Itens entram automaticamente ao aprovar um orçamento. Aqui você marca feito e controla as etapas.</div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Procedimento</th>
+            <th>Dente</th>
+            <th class="text-end">Valor</th>
+            <th>Criado em</th>
+            <th>Feito em</th>
+            <th style="width:160px"></th>
+            <th style="min-width:320px">Etapas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in plan %}
+          <tr>
+            <td>{{ it.procedure }}</td>
+            <td>{{ it.tooth or '-' }}</td>
+            <td class="text-end">R$ {{ cents_to_brl(it.amount_cents) }}</td>
+            <td>{{ sql_to_br(it.created_at) }}</td>
+            <td>{% if it.done %}{{ sql_to_br(it.done_at) }}{% endif %}</td>
+            <td>
+              {% if it.done %}
+                <span class="badge text-bg-success">Feito</span>
+                <a class="btn btn-sm btn-outline-secondary mt-2" href="{{ url_for('patients.plan_toggle', pid=patient.id, iid=it.id) }}">Desfazer</a>
+              {% else %}
+                <a class="btn btn-sm btn-brand" href="{{ url_for('patients.plan_toggle', pid=patient.id, iid=it.id) }}">Marcar feito</a>
+              {% endif %}
+            </td>
+            <td>
+              <ul class="small mb-2" style="padding-left:18px">
+                {% for st in it.steps %}
+                  <li class="mb-1">
+                    {% if st.done %}
+                      ✅
+                    {% else %}
+                      🔲
+                    {% endif %}
+                    {{ st.step }}
+                    <span class="text-muted">
+                      {% if st.done and st.done_at %}
+                        (feito em {{ sql_to_br(st.done_at) }})
+                      {% elif st.created_at %}
+                        (criado em {{ sql_to_br(st.created_at) }})
+                      {% endif %}
+                    </span>
+                    <a class="ms-2" href="{{ url_for('patients.plan_step_toggle', pid=patient.id, sid=st.id) }}">alternar</a>
+                  </li>
+                {% else %}
+                  <li class="text-muted">Sem etapas.</li>
+                {% endfor %}
+              </ul>
+              <form method="post" action="{{ url_for('patients.plan_add_step', pid=patient.id, iid=it.id) }}" class="d-flex gap-2">
+                <input class="form-control" name="step" placeholder="Nova etapa (ex.: anestesia, preparo...)" required>
+                <button class="btn btn-outline-secondary" type="submit">+</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Nenhum item no plano.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <h6 class="mb-3">Nova ficha clínica</h6>
+      <form method="post" action="{{ url_for('patients.record_save', pid=patient.id) }}" class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Queixa principal</label>
+          <input class="form-control" name="queixa" placeholder="Motivo da consulta">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Responsável / Profissional</label>
+          <input class="form-control" name="responsavel" placeholder="Nome do responsável">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Histórico / Evolução</label>
+          <textarea class="form-control" name="historico" rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Exame extraoral</label>
+          <textarea class="form-control" name="exames_extra" rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Exame intraoral</label>
+          <textarea class="form-control" name="exames_intra" rows="3"></textarea>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">Sinais vitais: PA</label>
+          <input class="form-control" name="sinais_pa" placeholder="120/80">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted">Sinais vitais: FC</label>
+          <input class="form-control" name="sinais_fc" placeholder="72">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Diagnóstico</label>
+          <textarea class="form-control" name="diagnostico" rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Conduta / Plano imediato</label>
+          <textarea class="form-control" name="conduta" rows="3"></textarea>
+        </div>
+        <div class="col-12 d-grid mt-2">
+          <button class="btn btn-brand">Salvar ficha</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="mb-3">Histórico de fichas</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>Queixa</th>
+              <th>Profissional</th>
+              <th style="width: 180px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr>
+              <td>{{ sql_to_br(r.created_at) }}</td>
+              <td>{{ (r.queixa or '')[:60] }}</td>
+              <td>{{ r.responsavel or '-' }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.record_view', pid=patient.id, rid=r.id) }}">Ver</a>
+                <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('patients.record_print', pid=patient.id, rid=r.id) }}">Imprimir</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma ficha registrada.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+{% elif tab=='anamnese' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h6 class="mb-1">Anamnese</h6>
+          <div class="text-muted small">Histórico médico e informações importantes do paciente.</div>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('patients.anamnesis_save', pid=patient.id) }}" class="row g-2 mt-2">
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Profissional / Responsável</label>
+          <input class="form-control" name="responsavel" placeholder="Nome de quem preencheu">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Queixa principal</label>
+          <input class="form-control" name="queixa" placeholder="Motivo da consulta">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Alergias</label>
+          <textarea class="form-control" name="alergias" rows="2" placeholder="Ex.: dipirona, latex..."></textarea>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Medicamentos em uso</label>
+          <textarea class="form-control" name="medicamentos" rows="2" placeholder="Ex.: losartana..."></textarea>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Doenças / Condições</label>
+          <textarea class="form-control" name="doencas" rows="2" placeholder="Ex.: asma, gastrite..."></textarea>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Histórico médico (resumo)</label>
+          <textarea class="form-control" name="historico_medico" rows="3" placeholder="Internações, acompanhamento, etc."></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Cirurgias / Procedimentos prévios</label>
+          <textarea class="form-control" name="cirurgias" rows="3" placeholder="Ex.: apendicite 2018..."></textarea>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Reação a anestesia / medicamentos</label>
+          <textarea class="form-control" name="anestesia_reacao" rows="2" placeholder="Se já teve alguma reação"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Problemas de sangramento / anticoagulantes</label>
+          <textarea class="form-control" name="sangramento" rows="2" placeholder="Ex.: usa AAS, varfarina..."></textarea>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Gestante</label>
+          <select class="form-select" name="gestante">
+            <option value="">—</option>
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
+            <option value="nao_aplica">Não se aplica</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Fumante</label>
+          <select class="form-select" name="fumante">
+            <option value="">—</option>
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
+            <option value="ocasional">Ocasional</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Álcool</label>
+          <select class="form-select" name="alcool">
+            <option value="">—</option>
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
+            <option value="social">Social</option>
+          </select>
+        </div>
+
+        <div class="col-12">
+          <div class="border rounded p-3">
+            <div class="text-muted small mb-2">Marque se o paciente possui:</div>
+            <div class="row g-2">
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="hipertensao" name="hipertensao">
+                <label class="form-check-label" for="hipertensao">Hipertensão</label>
+              </div>
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="diabetes" name="diabetes">
+                <label class="form-check-label" for="diabetes">Diabetes</label>
+              </div>
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="cardiaco" name="cardiaco">
+                <label class="form-check-label" for="cardiaco">Cardíaco</label>
+              </div>
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="hepatite" name="hepatite">
+                <label class="form-check-label" for="hepatite">Hepatite</label>
+              </div>
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="hiv" name="hiv">
+                <label class="form-check-label" for="hiv">HIV</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label small text-muted">Observações</label>
+          <textarea class="form-control" name="observacoes" rows="2" placeholder="Qualquer outra informação relevante"></textarea>
+        </div>
+
+        <div class="col-12 d-grid mt-2">
+          <button class="btn btn-brand">Salvar anamnese</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="mb-3">Histórico de anamneses</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>Queixa</th>
+              <th>Profissional</th>
+              <th style="width: 180px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in anamneses %}
+            <tr>
+              <td>{{ sql_to_br(a.created_at) }}</td>
+              <td>{{ (a.queixa or '')[:60] }}</td>
+              <td>{{ a.responsavel or '-' }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.anamnesis_view', pid=patient.id, aid=a.id) }}">Ver</a>
+                <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('patients.anamnesis_print', pid=patient.id, aid=a.id) }}">Imprimir</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma anamnese registrada.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+{% elif tab=='agenda' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <h6 class="mb-3">Novo agendamento</h6>
+      <form method="post" action="{{ url_for('patients.appointment_add', pid=patient.id) }}" class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Data e hora</label>
+          <input class="form-control" type="datetime-local" name="start_at" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Profissional</label>
+          <select class="form-select" name="provider_id" required>
+            <option value="">Selecione</option>
+            {% for p in providers %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Título</label>
+          <input class="form-control" name="title" value="Consulta">
+        </div>
+        <div class="col-12">
+          <label class="form-label small text-muted">Observações</label>
+          <input class="form-control" name="note" placeholder="Observações (opcional)">
+        </div>
+        <div class="col-12 d-grid mt-2">
+          <button class="btn btn-brand">Salvar agendamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="mb-3">Agendamentos deste paciente</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data/Hora</th>
+              <th>Profissional</th>
+              <th>Título</th>
+              <th>Obs.</th>
+              <th style="width: 120px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in appts %}
+            <tr>
+              <td>{{ sql_to_br(a.start_at) }}</td>
+              <td>{{ a.provider_name or '-' }}</td>
+              <td>{{ a.title }}</td>
+              <td>{{ a.note or '' }}</td>
+              <td class="text-end">
+                <form method="post" action="{{ url_for('patients.appointment_delete', pid=patient.id, aid=a.id) }}" onsubmit="return confirm('Excluir este agendamento?')">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Excluir</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">Nenhum agendamento.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+{% elif tab=='odontograma' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="mb-0">Odontograma</h6>
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Imprimir</button>
+      </div>
+      <div class="mt-3">
+        {% include 'partials/odontograma_inline.html' %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="mb-3">Registros salvos</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr><th>Dente</th><th>Status</th><th>Obs.</th><th>Atualizado</th></tr>
+          </thead>
+          <tbody>
+            {% for o in odontos %}
+            <tr>
+              <td>{{ o.tooth }}</td>
+              <td>{{ o.status }}</td>
+              <td>{{ o.note or '' }}</td>
+              <td>{{ sql_to_br(o.updated_at) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">Sem registros.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+{% endif %}
+
+{% endblock %}

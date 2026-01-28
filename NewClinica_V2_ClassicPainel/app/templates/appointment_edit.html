@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set title = "Editar agendamento" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <div>
+            <h5 class="mb-0">Editar agendamento</h5>
+            <div class="text-muted small">ID #{{ appt.id }}</div>
+          </div>
+          <div class="d-flex gap-2">
+            {% if next_url %}
+              <a class="btn btn-outline-secondary" href="{{ next_url }}">Voltar</a>
+            {% else %}
+              <a class="btn btn-outline-secondary" href="{{ url_for('agenda.index', date=appt.start_at[:10]) }}">Voltar</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Paciente</label>
+            <select class="form-select" name="patient_id" required>
+              {% for pa in patients %}
+                <option value="{{ pa.id }}" {% if pa.id == appt.patient_id %}selected{% endif %}>{{ pa.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Profissional</label>
+            <select class="form-select" name="provider_id">
+              <option value="">(opcional)</option>
+              {% for p in providers %}
+                <option value="{{ p.id }}" {% if appt.provider_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Início</label>
+              <input class="form-control" type="datetime-local" name="start_at" value="{{ sql_to_dtlocal(appt.start_at) }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fim</label>
+              <input class="form-control" type="datetime-local" name="end_at" value="{{ sql_to_dtlocal(appt.end_at) }}">
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">Título</label>
+            <input class="form-control" name="title" value="{{ appt.title }}">
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">Observações</label>
+            <textarea class="form-control" name="note" rows="3">{{ appt.note or '' }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2 mt-4">
+            <button class="btn btn-brand" type="submit">Salvar alterações</button>
+            {% if next_url %}
+              <a class="btn btn-outline-secondary" href="{{ next_url }}">Cancelar</a>
+            {% else %}
+              <a class="btn btn-outline-secondary" href="{{ url_for('agenda.index', date=appt.start_at[:10]) }}">Cancelar</a>
+            {% endif %}
+          </div>
+        </form>
+
+        <hr class="my-4">
+
+        <form method="post" action="{{ url_for('agenda.delete', aid=appt.id) }}" onsubmit="return confirm('Excluir este agendamento?')">
+          <button class="btn btn-outline-danger" type="submit">Excluir agendamento</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

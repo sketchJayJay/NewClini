@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set title = "Categorias" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Categorias</h4>
+    <div class="text-muted small">Organize entradas e saídas</div>
+  </div>
+  <a class="btn btn-brand" href="{{ url_for('finance.category_new') }}">Nova categoria</a>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Nome</th>
+          <th>Tipo</th>
+          <th>Status</th>
+          <th style="width: 160px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ r.kind }}</td>
+          <td>
+            {% if r.active %}
+              <span class="badge bg-success">Ativa</span>
+            {% else %}
+              <span class="badge bg-secondary">Inativa</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('finance.category_toggle', cid=r.id) }}" class="d-inline">
+              <button class="btn btn-sm btn-outline-secondary">{{ "Desativar" if r.active else "Ativar" }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">Sem categorias.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

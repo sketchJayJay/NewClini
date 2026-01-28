@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% set title = "Repasses" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Repasses</h4>
+    <div class="text-muted small">Controle simples de repasse por profissional</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h6 class="mb-3">Resumo</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Profissional</th>
+                <th class="text-end">Mês</th>
+                <th class="text-end">Pendente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+              <tr>
+                <td>{{ r.name }}</td>
+                <td class="text-end">R$ {{ cents_to_brl(r.repasse_mes or 0) }}</td>
+                <td class="text-end"><b>R$ {{ cents_to_brl(r.repasse_pendente or 0) }}</b></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="3" class="text-center text-muted py-3">Sem dados.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="text-muted small">Pendente = repasses de entradas pagas ainda não marcadas como pago.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h6 class="mb-3">Pendentes para pagar</h6>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Data</th>
+                <th>Profissional</th>
+                <th>Paciente</th>
+                <th class="text-end">Repasse</th>
+                <th style="width: 120px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in pend %}
+              <tr>
+                <td>{{ t.date }}</td>
+                <td>{{ t.provider_name }}</td>
+                <td>{{ t.patient_name or "—" }}</td>
+                <td class="text-end">
+                  R$ {{ cents_to_brl((t.amount_cents * t.repasse_percent) // 100) }}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('finance.repasse_pay', tid=t.id) }}">
+                    <button class="btn btn-sm btn-outline-success">Marcar pago</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-muted py-3">Nenhum repasse pendente.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

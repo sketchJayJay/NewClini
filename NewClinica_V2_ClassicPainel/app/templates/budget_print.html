@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orçamento - {{ patient.name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#6b1f2a;
+      --brand2:#3f0f16;
+      --muted:#6c757d;
+      --ink:#111827;
+      --paper:#ffffff;
+      --bg:#f6f7fb;
+      --wm: url('{{ url_for('static', filename='logo.png') }}');
+    }
+
+    *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body{ background:var(--bg); color:var(--ink); }
+
+    .paper{
+      position: relative;
+      max-width: 900px;
+      margin: 24px auto;
+      background: var(--paper);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+
+    /* Marca d'água */
+    .paper::before{
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: var(--wm);
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 520px;
+      opacity: .06;
+      filter: grayscale(100%);
+      transform: rotate(-10deg);
+      pointer-events: none;
+    }
+
+    .paper > *{ position: relative; z-index: 1; }
+
+    .topbar{
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      color: #fff;
+      padding: 18px 22px;
+      border-bottom: 1px solid rgba(255,255,255,.18);
+    }
+
+    .logo-wrap{ display:flex; gap:14px; align-items:center; }
+    .logo{
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.14);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      flex: 0 0 auto;
+      border: 1px solid rgba(255,255,255,.22);
+    }
+    .logo img{ max-height:52px; max-width:52px; }
+
+    .doc-title{ font-weight: 950; font-size: 20px; margin: 0; letter-spacing: .2px; }
+    .doc-sub{ font-size: 13px; opacity: .92; margin: 0; }
+    .clinic-name{ font-weight: 850; font-size: 14px; opacity: .98; margin: 0; }
+    .clinic-meta{ font-size: 12px; opacity: .92; margin: 0; }
+
+    .body{ padding: 22px; }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: rgba(255,255,255,.72);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #111;
+    }
+
+    .section{
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,.86);
+    }
+
+    .label{ color: var(--muted); font-size: 12px; }
+    .value{ font-weight: 750; font-size: 14px; }
+
+    .total{
+      font-size: 28px;
+      font-weight: 950;
+      color: var(--brand);
+      line-height: 1;
+    }
+
+    .meta-right{ text-align:right; }
+
+    .divider{
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,0,0,.18), transparent);
+      margin: 18px 0;
+    }
+
+    .sig{ margin-top: 28px; }
+    .line{ border-bottom: 1px dashed #9aa0a6; height: 22px; }
+    .small-muted{ color: var(--muted); font-size: 12px; }
+
+    .footer-note{
+      margin-top: 14px;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    .no-print{ max-width: 900px; margin: 18px auto 0 auto; }
+
+    @media print{
+      body{ background:#fff !important; }
+      .no-print{ display:none !important; }
+      .paper{ box-shadow:none !important; border-radius:0 !important; margin:0 !important; }
+      .paper::before{ opacity:.05; }
+    }
+
+    @page{ size: A4; margin: 14mm; }
+  </style>
+</head>
+<body>
+  <div class="no-print d-flex flex-wrap gap-2 align-items-center">
+    <button class="btn btn-outline-secondary" onclick="window.print()">🖨️ Imprimir</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('patients.view_patient', pid=patient.id, tab='orcamentos') }}">Voltar</a>
+    <span class="ms-auto text-muted" style="font-size:12px;">Dica: marque <b>“gráficos de fundo”</b> na impressão para aparecer a marca d'água.</span>
+  </div>
+
+  <div class="paper">
+    <div class="topbar">
+      <div class="logo-wrap">
+        <div class="logo">
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" onerror="this.style.display='none'">
+        </div>
+        <div>
+          <p class="clinic-name">{{ CLINIC_NAME or 'NewClínica Odonto' }}</p>
+          <p class="doc-title">Orçamento</p>
+          <p class="doc-sub">Documento gerado pelo sistema</p>
+          {% if CLINIC_PHONE or CLINIC_ADDRESS %}
+            <p class="clinic-meta">
+              {% if CLINIC_PHONE %}📞 {{ CLINIC_PHONE }}{% endif %}
+              {% if CLINIC_PHONE and CLINIC_ADDRESS %} • {% endif %}
+              {% if CLINIC_ADDRESS %}📍 {{ CLINIC_ADDRESS }}{% endif %}
+            </p>
+          {% endif %}
+          {% if CLINIC_EMAIL %}
+            <p class="clinic-meta">✉️ {{ CLINIC_EMAIL }}</p>
+          {% endif %}
+          {% if CLINIC_RESPONSIBLE or CLINIC_CNPJ %}
+            <p class="clinic-meta">
+              {% if CLINIC_RESPONSIBLE %}Responsável: {{ CLINIC_RESPONSIBLE }}{% endif %}
+              {% if CLINIC_RESPONSIBLE and CLINIC_CNPJ %} • {% endif %}
+              {% if CLINIC_CNPJ %}CNPJ: {{ CLINIC_CNPJ }}{% endif %}
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div class="section" style="flex:1; min-width: 320px;">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <div class="label">Paciente</div>
+              <div class="value" style="font-size:18px; font-weight:900;">{{ patient.name }}</div>
+              {% if patient.phone %}
+                <div class="small-muted">Contato: {{ patient.phone }}</div>
+              {% endif %}
+            </div>
+            <div class="meta-right">
+              <div class="pill">🗓️ {{ sql_to_br(budget.created_at) }}</div>
+              <div class="mt-2">
+                <div class="label">Status</div>
+                <div class="value text-capitalize">{{ budget.status }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="min-width: 260px;">
+          <div class="label">Valor total</div>
+          <div class="total">R$ {{ cents_to_brl(budget.amount_cents) }}</div>
+          <div class="small-muted mt-2">Orçamento #{{ '%05d'|format(budget.id) }}</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section">
+        <div class="label">Descrição</div>
+        <div class="value" style="font-size:15px;">{{ budget.description }}</div>
+      </div>
+
+      <div class="sig">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="line"></div>
+            <div class="small-muted mt-1">Assinatura do paciente</div>
+          </div>
+          <div class="col-md-6">
+            <div class="line"></div>
+            <div class="small-muted mt-1">Assinatura / carimbo da clínica</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        * Valores sujeitos a alterações conforme avaliação profissional.
+      </div>
+
+      <div class="footer-note">
+        {% if CLINIC_NAME %}<b>{{ CLINIC_NAME }}</b>{% endif %}
+        {% if CLINIC_PHONE %} | {{ CLINIC_PHONE }}{% endif %}
+        {% if CLINIC_ADDRESS %} | {{ CLINIC_ADDRESS }}{% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
