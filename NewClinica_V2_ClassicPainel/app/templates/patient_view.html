@@ -7,12 +7,17 @@
     <h4 class="mb-0">{{ patient.name }}</h4>
     <div class="text-muted small">
       {{ patient.phone or "Sem telefone" }}
+      {% if patient.cpf %} · CPF: {{ patient.cpf }}{% endif %}
       · Nascimento: {{ patient.birth_date or "—" }}
     </div>
+    {% if patient.address %}
+      <div class="text-muted small">Endereço: {{ patient.address }}</div>
+    {% endif %}
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('patients.list_patients') }}">Voltar</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('patients.edit_patient', pid=patient.id) }}">Editar</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('ortho.list_ortho', patient_id=patient.id) }}">Ortodontia</a>
     <a class="btn btn-brand" href="{{ url_for('finance.transaction_new', patient_id=patient.id, kind='income') }}">Nova cobrança</a>
   </div>
 </div>
@@ -24,8 +29,8 @@
   <li class="nav-item">
     <a class="nav-link {{ 'active' if tab=='plano_ficha' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='plano_ficha') }}">Plano/Ficha</a>
   </li>
-  <li class=\"nav-item\">
-    <a class=\"nav-link {{ 'active' if tab=='anamnese' else '' }}\" href=\"{{ url_for('patients.view_patient', pid=patient.id, tab='anamnese') }}\">Anamnese</a>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='anamnese' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='anamnese') }}">Anamnese</a>
   </li>
   <li class="nav-item">
     <a class="nav-link {{ 'active' if tab=='agenda' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='agenda') }}">Agenda</a>

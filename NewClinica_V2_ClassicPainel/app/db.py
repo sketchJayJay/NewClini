@@ -21,6 +21,24 @@ def close_db(e=None):
     if db is not None:
         db.close()
 
+
+def _ensure_columns(db: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    """Adiciona colunas (ALTER TABLE) se estiverem faltando.
+    Seguro para bases antigas: não quebra se a coluna já existir.
+    """
+    try:
+        existing = {r["name"] for r in db.execute(f"PRAGMA table_info({table})").fetchall()}
+    except Exception:
+        return
+    for col, col_type in columns.items():
+        if col in existing:
+            continue
+        try:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+        except Exception:
+            # Se der erro (ex.: coluna já existe por algum motivo), ignora
+            pass
+
 def init_db():
     db = get_db()
     db.executescript("""
@@ -35,6 +53,9 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         phone TEXT,
+        cpf TEXT,
+        address TEXT,
+        is_ortho INTEGER NOT NULL DEFAULT 0,
         birth_date TEXT,
         notes TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -212,6 +233,36 @@ def init_db():
 
     CREATE INDEX IF NOT EXISTS idx_odonto_patient ON odontograma(patient_id);
 
+
+    CREATE TABLE IF NOT EXISTS ortho_maintenances(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER NOT NULL,
+        provider_id INTEGER,
+        maintenance_date TEXT NOT NULL, -- YYYY-MM-DD
+        maintenance_done TEXT,
+        amount_cents INTEGER NOT NULL DEFAULT 0,
+        payment_status TEXT NOT NULL DEFAULT 'pending', -- paid|pending
+        payment_method TEXT NOT NULL DEFAULT 'pix',
+        due_date TEXT, -- YYYY-MM-DD
+        paid_at TEXT,  -- YYYY-MM-DD
+        next_date TEXT, -- YYYY-MM-DD
+        next_time TEXT, -- HH:MM
+        next_note TEXT,
+        finance_tx_id INTEGER,
+        appointment_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY(provider_id) REFERENCES providers(id) ON DELETE SET NULL,
+        FOREIGN KEY(finance_tx_id) REFERENCES transactions(id) ON DELETE SET NULL,
+        FOREIGN KEY(appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ortho_patient ON ortho_maintenances(patient_id);
+    CREATE INDEX IF NOT EXISTS idx_ortho_next ON ortho_maintenances(next_date, next_time);
+    CREATE INDEX IF NOT EXISTS idx_ortho_pay ON ortho_maintenances(payment_status, due_date);
+
+
     CREATE TABLE IF NOT EXISTS app_settings(
         key TEXT PRIMARY KEY,
         value TEXT
@@ -231,6 +282,9 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_bdaylog_patient_sent ON birthday_log(patient_id, sent_on);
 
     """)
+    # Migrações leves (bases antigas)
+    _ensure_columns(db, "patients", {"cpf": "TEXT", "address": "TEXT", "is_ortho": "INTEGER NOT NULL DEFAULT 0"})
+
     db.commit()
 
 def ensure_seed_data():
@@ -239,6 +293,7 @@ def ensure_seed_data():
     defaults = [
         ("Consultas", "income"),
         ("Procedimentos", "income"),
+        ("Ortodontia", "income"),
         ("Materiais/Estoque", "expense"),
         ("Aluguel", "expense"),
         ("Internet/Luz/Água", "expense"),
@@ -254,6 +309,23 @@ def ensure_seed_data():
             "Oi {nome}! 🎉 Hoje é seu aniversário e a {clinica} deseja um dia incrível! Se quiser agendar sua consulta/revisão, é só me chamar por aqui 🙂",
         ),
     )
+
+    # Profissionais padrão (Dentistas)
+    default_providers = [
+        "Hellen",
+        "Beatriz",
+        "Marcos",
+        "Daniel",
+        "Diego",
+        "Credemildo",
+    ]
+    for pname in default_providers:
+        exists = db.execute("SELECT 1 FROM providers WHERE name=? LIMIT 1", (pname,)).fetchone()
+        if not exists:
+            db.execute(
+                "INSERT INTO providers(name, role, default_repasse_percent, active) VALUES(?, 'Dentista', 0, 1)",
+                (pname,),
+            )
     db.commit()
 
 def get_open_cash_session_id() -> int | None:

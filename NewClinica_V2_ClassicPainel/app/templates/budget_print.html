@@ -183,6 +183,12 @@
               {% if patient.phone %}
                 <div class="small-muted">Contato: {{ patient.phone }}</div>
               {% endif %}
+              {% if patient.cpf %}
+                <div class="small-muted">CPF: {{ patient.cpf }}</div>
+              {% endif %}
+              {% if patient.address %}
+                <div class="small-muted">Endereço: {{ patient.address }}</div>
+              {% endif %}
             </div>
             <div class="meta-right">
               <div class="pill">🗓️ {{ sql_to_br(budget.created_at) }}</div>

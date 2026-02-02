@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% set title = "Ortodontia" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Ortodontia</h4>
+    <div class="text-muted small">Manutenções, próximos retornos e pagamentos (integra com o Financeiro)</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-brand" href="{{ url_for('ortho.new_ortho', patient_id=filters.patient_id) }}">Nova manutenção</a>
+  </div>
+</div>
+
+<form class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Paciente</label>
+        <select class="form-select" name="patient_id">
+          <option value="">Todos</option>
+          {% for p in patients %}
+            <option value="{{ p.id }}" {% if filters.patient_id|int == p.id %}selected{% endif %}>{{ p.name }}{% if p.cpf %} ({{ p.cpf }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="status">
+          <option value="">Todos</option>
+          <option value="paid" {% if filters.status=="paid" %}selected{% endif %}>Pago</option>
+          <option value="pending" {% if filters.status=="pending" %}selected{% endif %}>A receber</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Busca</label>
+        <input class="form-control" name="q" placeholder="Nome, CPF, manutenção..." value="{{ filters.q }}">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100">Filtrar</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Paciente</th>
+            <th>Data manutenção</th>
+            <th>Manutenção realizada</th>
+            <th>Pagamento</th>
+            <th>Próxima manutenção</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ r.patient_name }}</div>
+                {% if r.patient_cpf %}<div class="text-muted small">CPF: {{ r.patient_cpf }}</div>{% endif %}
+              </td>
+              <td>{{ r.maintenance_date }}</td>
+              <td style="max-width: 420px;">
+                <div class="small">{{ r.maintenance_done or "—" }}</div>
+              </td>
+              <td>
+                {% if r.payment_status == 'paid' %}
+                  <span class="badge text-bg-success">Pago</span>
+                  <div class="small mt-1">R$ {{ cents_to_brl(r.amount_cents) }}</div>
+                  {% if r.paid_at %}<div class="text-muted small">em {{ r.paid_at }}</div>{% endif %}
+                {% else %}
+                  <span class="badge text-bg-warning">A receber</span>
+                  <div class="small mt-1">R$ {{ cents_to_brl(r.amount_cents) }}</div>
+                  {% if r.due_date %}<div class="text-muted small">venc. {{ r.due_date }}</div>{% endif %}
+                {% endif %}
+              </td>
+              <td>
+                {% if r.next_date %}
+                  <div class="fw-semibold">{{ r.next_date }}</div>
+                  <div class="text-muted small">{{ r.next_time or "" }}</div>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.view_patient', pid=r.patient_id) }}">Paciente</a>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('ortho.edit_ortho', oid=r.id) }}">Editar</a>
+
+                  {% if r.payment_status == 'pending' and (r.amount_cents or 0) > 0 %}
+                    <form class="d-flex gap-1 align-items-end" method="post" action="{{ url_for('ortho.confirm_payment', oid=r.id) }}">
+                      <div>
+                        <label class="form-label small mb-1">Pago em</label>
+                        <input class="form-control form-control-sm" type="date" name="paid_at" value="">
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1">Método</label>
+                        <select class="form-select form-select-sm" name="payment_method">
+                          <option value="pix">Pix</option>
+                          <option value="cash">Dinheiro</option>
+                          <option value="card_credit">Cartão crédito</option>
+                          <option value="card_debit">Cartão débito</option>
+                          <option value="transfer">Transferência</option>
+                          <option value="other">Outro</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1">&nbsp;</label>
+                        <button class="btn btn-sm btn-success">Confirmar</button>
+                      </div>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+          {% if not rows %}
+            <tr><td colspan="6" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -11,7 +11,7 @@
 
 <form class="row g-2 mb-3">
   <div class="col-sm-8 col-md-6">
-    <input class="form-control" name="q" placeholder="Buscar por nome..." value="{{ q }}">
+    <input class="form-control" name="q" placeholder="Buscar por nome ou CPF..." value="{{ q }}">
   </div>
   <div class="col-sm-4 col-md-2">
     <button class="btn btn-outline-secondary w-100">Buscar</button>
@@ -24,17 +24,21 @@
       <thead class="table-light">
         <tr>
           <th>Nome</th>
+          <th class="d-none d-lg-table-cell">CPF</th>
           <th class="d-none d-md-table-cell">Telefone</th>
-          <th class="d-none d-lg-table-cell">Nascimento</th>
+          <th class="d-none d-xl-table-cell">Nascimento</th>
           <th style="width: 220px"></th>
         </tr>
       </thead>
       <tbody>
         {% for p in patients %}
         <tr>
-          <td><a class="text-decoration-none" href="{{ url_for('patients.view_patient', pid=p.id, tab='orcamentos') }}">{{ p.name }}</a></td>
+          <td>
+            <a class="text-decoration-none" href="{{ url_for('patients.view_patient', pid=p.id, tab='orcamentos') }}">{{ p.name }}</a>
+          </td>
+          <td class="d-none d-lg-table-cell">{{ p.cpf or "" }}</td>
           <td class="d-none d-md-table-cell">{{ p.phone or "" }}</td>
-          <td class="d-none d-lg-table-cell">{{ p.birth_date or "" }}</td>
+          <td class="d-none d-xl-table-cell">{{ p.birth_date or "" }}</td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.edit_patient', pid=p.id) }}">Editar</a>
             <form method="post" action="{{ url_for('patients.delete_patient', pid=p.id) }}" class="d-inline" onsubmit="return confirm('Remover paciente?')">
@@ -43,7 +47,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="4" class="text-center text-muted py-4">Nenhum paciente.</td></tr>
+        <tr><td colspan="5" class="text-center text-muted py-4">Nenhum paciente.</td></tr>
         {% endfor %}
       </tbody>
     </table>

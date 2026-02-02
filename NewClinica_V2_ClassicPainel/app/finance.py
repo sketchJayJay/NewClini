@@ -94,8 +94,8 @@ def transactions():
             params.append(payment_method)
 
     if q:
-        where.append("(t.description LIKE ?)")
-        params.append(f"%{q}%")
+        where.append("(t.description LIKE ? OR p.name LIKE ? OR p.cpf LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
     if date_from:
         where.append("t.date>=?")
         params.append(date_from)
@@ -111,7 +111,7 @@ def transactions():
 
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     rows = db.execute(
-        "SELECT t.*, p.name AS patient_name, c.name AS category_name, pr.name AS provider_name "
+        "SELECT t.*, p.name AS patient_name, p.cpf AS patient_cpf, c.name AS category_name, pr.name AS provider_name "
         "FROM transactions t "
         "LEFT JOIN patients p ON p.id=t.patient_id "
         "LEFT JOIN categories c ON c.id=t.category_id "
@@ -151,7 +151,7 @@ def transactions():
         if r["status"] == "pending":
             total_pending += int(r["amount_cents"])
 
-    patients = db.execute("SELECT id, name FROM patients ORDER BY name ASC").fetchall()
+    patients = db.execute("SELECT id, name, cpf FROM patients ORDER BY name ASC").fetchall()
     categories = db.execute("SELECT id, name FROM categories WHERE active=1 ORDER BY name ASC").fetchall()
 
     pm_labels = {k: v for k, v in PAYMENT_METHODS}
@@ -183,7 +183,7 @@ def transactions():
 @finance_required
 def transaction_new():
     db = get_db()
-    patients = db.execute("SELECT id, name FROM patients ORDER BY name ASC").fetchall()
+    patients = db.execute("SELECT id, name, cpf FROM patients ORDER BY name ASC").fetchall()
     categories = db.execute("SELECT id, name, kind FROM categories WHERE active=1 ORDER BY name ASC").fetchall()
     providers = db.execute("SELECT id, name, default_repasse_percent FROM providers WHERE active=1 ORDER BY name ASC").fetchall()
 
@@ -260,7 +260,7 @@ def transaction_edit(tid: int):
         flash("Lançamento não encontrado.", "danger")
         return redirect(url_for("finance.transactions"))
 
-    patients = db.execute("SELECT id, name FROM patients ORDER BY name ASC").fetchall()
+    patients = db.execute("SELECT id, name, cpf FROM patients ORDER BY name ASC").fetchall()
     categories = db.execute("SELECT id, name, kind FROM categories WHERE active=1 ORDER BY name ASC").fetchall()
     providers = db.execute("SELECT id, name, default_repasse_percent FROM providers WHERE active=1 ORDER BY name ASC").fetchall()
 

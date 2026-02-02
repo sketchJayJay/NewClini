@@ -57,8 +57,8 @@ def list_patients():
     db = get_db()
     if q:
         rows = db.execute(
-            "SELECT * FROM patients WHERE name LIKE ? ORDER BY name ASC",
-            (f"%{q}%",),
+            "SELECT * FROM patients WHERE name LIKE ? OR cpf LIKE ? ORDER BY name ASC",
+            (f"%{q}%", f"%{q}%"),
         ).fetchall()
     else:
         rows = db.execute("SELECT * FROM patients ORDER BY name ASC").fetchall()
@@ -74,12 +74,15 @@ def new_patient():
             flash("Nome é obrigatório.", "danger")
             return render_template("patient_form.html", patient=None)
         phone = request.form.get("phone", "").strip()
+        cpf = request.form.get("cpf", "").strip()
+        address = request.form.get("address", "").strip()
+        is_ortho = 1 if (request.form.get("is_ortho") == "1") else 0
         birth_date = request.form.get("birth_date", "").strip() or None
         notes = request.form.get("notes", "").strip()
         db = get_db()
         db.execute(
-            "INSERT INTO patients(name, phone, birth_date, notes) VALUES(?,?,?,?)",
-            (name, phone, birth_date, notes),
+            "INSERT INTO patients(name, phone, cpf, address, is_ortho, birth_date, notes) VALUES(?,?,?,?,?,?,?)",
+            (name, phone, cpf, address, is_ortho, birth_date, notes),
         )
         db.commit()
         flash("Paciente cadastrado ✅", "success")
@@ -207,11 +210,14 @@ def edit_patient(pid: int):
             flash("Nome é obrigatório.", "danger")
             return render_template("patient_form.html", patient=patient)
         phone = request.form.get("phone", "").strip()
+        cpf = request.form.get("cpf", "").strip()
+        address = request.form.get("address", "").strip()
+        is_ortho = 1 if (request.form.get("is_ortho") == "1") else 0
         birth_date = request.form.get("birth_date", "").strip() or None
         notes = request.form.get("notes", "").strip()
         db.execute(
-            "UPDATE patients SET name=?, phone=?, birth_date=?, notes=? WHERE id=?",
-            (name, phone, birth_date, notes, pid),
+            "UPDATE patients SET name=?, phone=?, cpf=?, address=?, is_ortho=?, birth_date=?, notes=? WHERE id=?",
+            (name, phone, cpf, address, is_ortho, birth_date, notes, pid),
         )
         db.commit()
         flash("Paciente atualizado ✅", "success")

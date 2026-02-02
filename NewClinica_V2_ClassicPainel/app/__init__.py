@@ -10,6 +10,7 @@ from .patients import bp as patients_bp
 from .finance import bp as finance_bp
 from .agenda import bp as agenda_bp
 from .birthdays import bp as birthdays_bp
+from .ortho import bp as ortho_bp
 
 def create_app() -> Flask:
     app = Flask(__name__, instance_relative_config=True)
@@ -56,6 +57,7 @@ def create_app() -> Flask:
     app.register_blueprint(finance_bp)
     app.register_blueprint(agenda_bp)
     app.register_blueprint(birthdays_bp)
+    app.register_blueprint(ortho_bp)
 
     # DB teardown
     app.teardown_appcontext(close_db)

@@ -56,7 +56,7 @@
         <select class="form-select" name="patient_id">
           <option value="">Todos</option>
           {% for p in patients %}
-            <option value="{{ p.id }}" {% if filters.patient_id|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+            <option value="{{ p.id }}" {% if filters.patient_id|int == p.id %}selected{% endif %}>{{ p.name }}{% if p.cpf %} ({{ p.cpf }}){% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -197,7 +197,10 @@
             {% endif %}
           </td>
           <td>{{ pm_labels.get(r.payment_method, r.payment_method) }}</td>
-          <td>{{ r.patient_name or "—" }}</td>
+          <td>
+            <div>{{ r.patient_name or "—" }}</div>
+            {% if r.patient_cpf %}<div class="text-muted small">{{ r.patient_cpf }}</div>{% endif %}
+          </td>
           <td>{{ r.category_name or "—" }}</td>
           <td>{{ r.provider_name or "—" }}</td>
           <td class="text-muted">{{ r.description or "" }}</td>
