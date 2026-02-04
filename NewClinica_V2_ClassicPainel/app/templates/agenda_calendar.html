@@ -396,11 +396,51 @@ async function loadReminders(){
   const tomStr = brDate(tomorrow);
   const tom = events.filter(e => brDate(e._start) === tomStr);
 
+  // WhatsApp helper: limpa número e garante DDI 55 quando possível
+  function waDigits(phone){
+    if(!phone) return "";
+    let d = String(phone).replace(/\D/g,'');
+    if(!d) return "";
+    // se já vier com DDI
+    if(d.startsWith('55')) return d;
+    // telefones BR comuns (10 ou 11 dígitos)
+    if(d.length === 10 || d.length === 11) return '55' + d;
+    return d;
+  }
+
+  function waLink(ev){
+    const p = ev.extendedProps || {};
+    const phone = waDigits(p.patient_phone || "");
+    if(!phone) return "";
+
+    const pname = (p.patient_name || "").trim() || ((ev.title || "").split('•')[0] || "").trim();
+    let raw = (p.raw_title || "").trim();
+    if(!raw){
+      const parts = (ev.title || "").split('•');
+      raw = parts.length > 1 ? parts.slice(1).join('•').trim() : "Consulta";
+    }
+
+    const msg = `Olá ${pname || 'tudo bem?'}! Passando pra lembrar do seu horário em ${brDate(ev._start)} às ${brTime(ev._start)} (${raw}).`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  }
+
   function line(ev){
-    const prov = ev.extendedProps?.provider || "";
+    const p = ev.extendedProps || {};
+    const prov = (p.provider_name || "").trim();
     const ptxt = prov ? ` • ${prov}` : "";
-    const name = ev.extendedProps?.patient || ev.title || "Agendamento";
-    return `<li class="mb-1"><b>${brTime(ev._start)}</b> ${name}${ptxt}</li>`;
+    const pname = (p.patient_name || "").trim();
+    let raw = (p.raw_title || "").trim();
+    if(!raw){
+      const parts = (ev.title || "").split('•');
+      raw = parts.length > 1 ? parts.slice(1).join('•').trim() : "";
+    }
+    const name = pname ? `${pname}${raw ? ' • ' + raw : ''}` : (ev.title || "Agendamento");
+    const wa = waLink(ev);
+    const btn = wa ? `<a class="btn btn-sm btn-success" target="_blank" href="${wa}" title="Abrir WhatsApp" style="padding:.15rem .45rem;">WhatsApp</a>` : ``;
+    return `<li class="mb-1 d-flex align-items-center justify-content-between gap-2">
+      <div><b>${brTime(ev._start)}</b> ${name}${ptxt}</div>
+      ${btn}
+    </li>`;
   }
 
   if(!soon.length && !today.length && !tom.length){
