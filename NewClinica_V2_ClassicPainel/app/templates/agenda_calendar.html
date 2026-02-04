@@ -33,6 +33,7 @@
 
 <div class="row g-3">
   <div class="col-lg-9">
+    <div id="agendaReminders" class="mb-3"></div>
     <div id="calendar"></div>
     <div class="mini-hint mt-2">
       Dica: arraste o evento para outro dia/horário. Você também pode <b>puxar a ponta</b> do evento para aumentar/diminuir a duração.
@@ -277,6 +278,7 @@
         await post("{{ url_for('agenda.update_event', aid=0) }}".replace("/0", "/" + currentEventId), payload);
         modal.hide();
         calendar.refetchEvents();
+    loadReminders();
       }
     }catch(err){
       alert("Não consegui salvar. Tenta de novo.");
@@ -347,9 +349,88 @@
   });
 
   calendar.render();
+  loadReminders();
 
   document.getElementById("providerFilter").addEventListener("change", () => {
     calendar.refetchEvents();
+    loadReminders();
   });
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function toIsoLocal(d){
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+}
+function brDate(d){
+  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
+}
+function brTime(d){
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+async function loadReminders(){
+  const box = document.getElementById('agendaReminders');
+  if(!box) return;
+
+  const now = new Date();
+  const start = new Date(now); start.setDate(start.getDate()-1); start.setHours(0,0,0,0);
+  const end = new Date(now); end.setDate(end.getDate()+7); end.setHours(23,59,0,0);
+
+  const url = `{{ url_for('agenda.events') }}?start=${encodeURIComponent(toIsoLocal(start))}&end=${encodeURIComponent(toIsoLocal(end))}`;
+  const res = await fetch(url);
+  const all = await res.json();
+
+  const providerId = (document.getElementById('providerFilter')?.value || "").trim();
+  const events = all
+    .filter(e => !providerId || String(e.extendedProps?.provider_id || "") === String(providerId))
+    .map(e => ({...e, _start: new Date(e.start), _end: e.end ? new Date(e.end) : null }))
+    .filter(e => !isNaN(e._start.getTime()))
+    .sort((a,b)=>a._start-b._start);
+
+  const soonLimit = new Date(now.getTime() + 2*60*60*1000); // 2h
+  const soon = events.filter(e => e._start >= now && e._start <= soonLimit);
+
+  const todayStr = brDate(now);
+  const today = events.filter(e => brDate(e._start) === todayStr && e._start >= new Date(now.getFullYear(),now.getMonth(),now.getDate(),0,0,0));
+
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate()+1);
+  const tomStr = brDate(tomorrow);
+  const tom = events.filter(e => brDate(e._start) === tomStr);
+
+  function line(ev){
+    const prov = ev.extendedProps?.provider || "";
+    const ptxt = prov ? ` • ${prov}` : "";
+    const name = ev.extendedProps?.patient || ev.title || "Agendamento";
+    return `<li class="mb-1"><b>${brTime(ev._start)}</b> ${name}${ptxt}</li>`;
+  }
+
+  if(!soon.length && !today.length && !tom.length){
+    box.innerHTML = `<div class="alert alert-light border shadow-sm mb-0">
+      <div class="fw-semibold">🔔 Lembretes</div>
+      <div class="text-muted small">Nenhum aviso por aqui. Agenda tranquila por enquanto.</div>
+    </div>`;
+    return;
+  }
+
+  let html = `<div class="alert alert-warning border-0 shadow-sm mb-0">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="fw-semibold">🔔 Lembretes da agenda</div>
+      <div class="small text-muted">Baseado nos próximos 7 dias</div>
+    </div>
+    <div class="mt-2">`;
+
+  if(soon.length){
+    html += `<div class="fw-semibold mb-1">⏰ Em breve (até 2h)</div><ul class="mb-2 small">${soon.slice(0,6).map(line).join('')}</ul>`;
+  }
+  if(today.length){
+    html += `<div class="fw-semibold mb-1">📅 Hoje</div><ul class="mb-2 small">${today.slice(0,8).map(line).join('')}</ul>`;
+  }
+  if(tom.length){
+    html += `<div class="fw-semibold mb-1">🗓️ Amanhã</div><ul class="mb-0 small">${tom.slice(0,8).map(line).join('')}</ul>`;
+  }
+  html += `</div></div>`;
+  box.innerHTML = html;
+}
+
+
 </script>
 {% endblock %}

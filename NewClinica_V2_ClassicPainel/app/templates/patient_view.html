@@ -192,9 +192,16 @@
             <td>
               {% if it.done %}
                 <span class="badge text-bg-success">Feito</span>
-                <a class="btn btn-sm btn-outline-secondary mt-2" href="{{ url_for('patients.plan_toggle', pid=patient.id, iid=it.id) }}">Desfazer</a>
+                <form method="post" action="{{ url_for('patients.plan_set_done', pid=patient.id, iid=it.id) }}" class="mt-2">
+  <input type="hidden" name="op" value="undo">
+  <button class="btn btn-sm btn-outline-secondary" type="submit">Desfazer</button>
+</form>
               {% else %}
-                <a class="btn btn-sm btn-brand" href="{{ url_for('patients.plan_toggle', pid=patient.id, iid=it.id) }}">Marcar feito</a>
+                <form method="post" action="{{ url_for('patients.plan_set_done', pid=patient.id, iid=it.id) }}" class="d-flex flex-wrap gap-2 align-items-center">
+  <input type="hidden" name="op" value="done">
+  <input type="date" class="form-control form-control-sm" name="done_date" value="{{ today }}" style="max-width:160px">
+  <button class="btn btn-sm btn-brand" type="submit">Marcar feito</button>
+</form>
               {% endif %}
             </td>
             <td>
@@ -209,12 +216,25 @@
                     {{ st.step }}
                     <span class="text-muted">
                       {% if st.done and st.done_at %}
-                        (feito em {{ sql_to_br(st.done_at) }})
+                        (feito em {{ sql_to_br(st.done_at) }})<form method="post" action="{{ url_for('patients.plan_step_set_done', pid=patient.id, sid=st.id) }}" class="d-inline-flex gap-2 align-items-center ms-2">
+  <input type="hidden" name="op" value="done">
+  <input type="date" class="form-control form-control-sm" name="done_date" value="{{ st.done_at[:10] if st.done_at else today }}" style="max-width:155px; font-size:.8rem; padding:.15rem .35rem">
+  <button class="btn btn-sm btn-outline-secondary py-0" type="submit" style="font-size:.8rem">salvar data</button>
+</form>
                       {% elif st.created_at %}
                         (criado em {{ sql_to_br(st.created_at) }})
                       {% endif %}
                     </span>
-                    <a class="ms-2" href="{{ url_for('patients.plan_step_toggle', pid=patient.id, sid=st.id) }}">alternar</a>
+                    <form method="post" action="{{ url_for('patients.plan_step_set_done', pid=patient.id, sid=st.id) }}" class="d-inline-flex flex-wrap gap-2 align-items-center ms-2">
+  {% if st.done %}
+    <input type="hidden" name="op" value="undo">
+    <button class="btn btn-sm btn-outline-secondary py-0" type="submit" style="font-size:.8rem">desfazer</button>
+  {% else %}
+    <input type="hidden" name="op" value="done">
+    <input type="date" class="form-control form-control-sm" name="done_date" value="{{ today }}" style="max-width:155px; font-size:.8rem; padding:.15rem .35rem">
+    <button class="btn btn-sm btn-outline-secondary py-0" type="submit" style="font-size:.8rem">marcar</button>
+  {% endif %}
+</form>
                   </li>
                 {% else %}
                   <li class="text-muted">Sem etapas.</li>

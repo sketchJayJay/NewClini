@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
+import re
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from .auth import login_required
@@ -49,6 +50,26 @@ def _sql_to_br(dt_sql: str | None) -> str:
             return dt_sql
     return dt_sql
 
+
+
+def _parse_date_input(s: str | None) -> str | None:
+    """Aceita 'YYYY-MM-DD' (input type=date) ou 'dd/mm/aaaa' e retorna 'YYYY-MM-DD'."""
+    if not s:
+        return None
+    v = str(s).strip()
+    if not v:
+        return None
+    # ISO
+    if len(v) == 10 and v[4] == "-" and v[7] == "-":
+        y, m, d = v[0:4], v[5:7], v[8:10]
+        if y.isdigit() and m.isdigit() and d.isdigit():
+            return v
+    # BR
+    if len(v) == 10 and v[2] == "/" and v[5] == "/":
+        d, mo, y = v[0:2], v[3:5], v[6:10]
+        if y.isdigit() and mo.isdigit() and d.isdigit():
+            return f"{y}-{mo}-{d}"
+    return None
 
 @bp.route("/")
 @login_required
@@ -347,6 +368,30 @@ def plan_toggle(pid: int, iid: int):
     return redirect(url_for("patients.view_patient", pid=pid, tab="plano_ficha"))
 
 
+
+@bp.post("/<int:pid>/plan/<int:iid>/set")
+@login_required
+def plan_set_done(pid: int, iid: int):
+    """Marca/desfaz procedimento e permite informar data manual (feito em)."""
+    f = request.form
+    op = (f.get("op") or "done").strip()  # done | undo
+    done_date = _parse_date_input(f.get("done_date"))
+    db = get_db()
+    row = db.execute("SELECT id FROM plan_items WHERE id=? AND patient_id=?", (iid, pid)).fetchone()
+    if not row:
+        flash("Procedimento não encontrado.", "danger")
+        return redirect(url_for("patients.view_patient", pid=pid, tab="plano_ficha"))
+
+    if op == "undo":
+        db.execute("UPDATE plan_items SET done=0, done_at=NULL WHERE id=? AND patient_id=?", (iid, pid))
+    else:
+        if done_date:
+            db.execute("UPDATE plan_items SET done=1, done_at=? WHERE id=? AND patient_id=?", (done_date, iid, pid))
+        else:
+            db.execute("UPDATE plan_items SET done=1, done_at=datetime('now') WHERE id=? AND patient_id=?", (iid, pid))
+    db.commit()
+    return redirect(url_for("patients.view_patient", pid=pid, tab="plano_ficha"))
+
 @bp.post("/<int:pid>/plan/<int:iid>/steps/add")
 @login_required
 def plan_add_step(pid: int, iid: int):
@@ -388,6 +433,35 @@ def plan_step_toggle(pid: int, sid: int):
     db.commit()
     return redirect(url_for("patients.view_patient", pid=pid, tab="plano_ficha"))
 
+
+
+@bp.post("/<int:pid>/plan/steps/<int:sid>/set")
+@login_required
+def plan_step_set_done(pid: int, sid: int):
+    """Marca/desfaz etapa e permite informar data manual (feito em)."""
+    f = request.form
+    op = (f.get("op") or "done").strip()  # done | undo
+    done_date = _parse_date_input(f.get("done_date"))
+    db = get_db()
+    row = db.execute(
+        "SELECT ps.id FROM plan_steps ps "
+        "JOIN plan_items pi ON pi.id=ps.plan_item_id "
+        "WHERE ps.id=? AND pi.patient_id=?",
+        (sid, pid),
+    ).fetchone()
+    if not row:
+        flash("Etapa não encontrada.", "danger")
+        return redirect(url_for("patients.view_patient", pid=pid, tab="plano_ficha"))
+
+    if op == "undo":
+        db.execute("UPDATE plan_steps SET done=0, done_at=NULL WHERE id=?", (sid,))
+    else:
+        if done_date:
+            db.execute("UPDATE plan_steps SET done=1, done_at=? WHERE id=?", (done_date, sid))
+        else:
+            db.execute("UPDATE plan_steps SET done=1, done_at=datetime('now') WHERE id=?", (sid,))
+    db.commit()
+    return redirect(url_for("patients.view_patient", pid=pid, tab="plano_ficha"))
 
 @bp.post("/<int:pid>/records/save")
 @login_required
