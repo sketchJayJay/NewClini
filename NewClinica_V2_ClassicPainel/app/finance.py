@@ -73,6 +73,7 @@ def transactions():
     patient_id = request.args.get("patient_id", "").strip()
     category_id = request.args.get("category_id", "").strip()
 
+    provider_id = request.args.get("provider_id", "").strip()
     where = []
     params = []
     if kind in ("income", "expense"):
@@ -109,6 +110,9 @@ def transactions():
         where.append("t.category_id=?")
         params.append(int(category_id))
 
+    if provider_id.isdigit():
+        where.append("t.provider_id=?")
+        params.append(int(provider_id))
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     rows = db.execute(
         "SELECT t.*, p.name AS patient_name, p.cpf AS patient_cpf, c.name AS category_name, pr.name AS provider_name "
@@ -120,13 +124,12 @@ def transactions():
         "ORDER BY t.date DESC, t.id DESC LIMIT 300",
         tuple(params),
     ).fetchall()
-
     # totals
     total_income = 0
     total_expense = 0
-    total_pending = 0
+    total_pending = 0  # a receber (somente entradas pendentes)
 
-    # breakdown das ENTRADAS por método de pagamento
+    # breakdown das ENTRADAS PAGAS por método de pagamento
     income_by_pm_cents = {
         "cash": 0,
         "pix": 0,
@@ -135,25 +138,35 @@ def transactions():
         "transfer": 0,
         "other": 0,
     }
-    for r in rows:
-        if r["kind"] == "income":
-            total_income += int(r["amount_cents"])
 
-            pm = (r["payment_method"] or "other").strip()
-            # legado: versões antigas salvavam só "card"
-            if pm == "card":
-                pm = "card_credit"
-            if pm not in income_by_pm_cents:
-                pm = "other"
-            income_by_pm_cents[pm] += int(r["amount_cents"])
+    for r in rows:
+        amt = int(r["amount_cents"] or 0)
+
+        if r["kind"] == "income":
+            if r["status"] == "paid":
+                # só entra no "dim dim" quando estiver PAGO ✅
+                total_income += amt
+
+                pm = (r["payment_method"] or "other").strip()
+                # legado: versões antigas salvavam só "card"
+                if pm == "card":
+                    pm = "card_credit"
+                if pm not in income_by_pm_cents:
+                    pm = "other"
+                income_by_pm_cents[pm] += amt
+            else:
+                # pendente não é entrada
+                total_pending += amt
+
         else:
-            total_expense += int(r["amount_cents"])
-        if r["status"] == "pending":
-            total_pending += int(r["amount_cents"])
+            # saídas: somar só se estiver pago
+            if r["status"] == "paid":
+                total_expense += amt
 
     patients = db.execute("SELECT id, name, cpf FROM patients ORDER BY name ASC").fetchall()
     categories = db.execute("SELECT id, name FROM categories WHERE active=1 ORDER BY name ASC").fetchall()
 
+    providers = db.execute("SELECT id, name FROM providers WHERE active=1 ORDER BY name ASC").fetchall()
     pm_labels = {k: v for k, v in PAYMENT_METHODS}
 
     income_by_pm = {
@@ -170,11 +183,12 @@ def transactions():
         rows=rows,
         cents_to_brl=cents_to_brl,
         pm_labels=pm_labels,
-        filters=dict(kind=kind, status=status, payment_method=payment_method, q=q, date_from=date_from, date_to=date_to, patient_id=patient_id, category_id=category_id),
+        filters=dict(kind=kind, status=status, payment_method=payment_method, provider_id=provider_id, q=q, date_from=date_from, date_to=date_to, patient_id=patient_id, category_id=category_id),
         totals=dict(income=cents_to_brl(total_income), expense=cents_to_brl(total_expense), pending=cents_to_brl(total_pending)),
         income_by_pm=income_by_pm,
         patients=patients,
         categories=categories,
+        providers=providers,
         pm=PAYMENT_METHODS,
     )
 

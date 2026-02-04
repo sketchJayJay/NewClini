@@ -138,6 +138,7 @@ def list_ortho():
     db = get_db()
     q = (request.args.get("q") or "").strip()
     patient_id = (request.args.get("patient_id") or "").strip()
+    provider_id = (request.args.get("provider_id") or "").strip()
     pay_status = (request.args.get("status") or "").strip()  # paid|pending|''
 
     where = []
@@ -148,6 +149,9 @@ def list_ortho():
     if patient_id.isdigit():
         where.append("o.patient_id=?")
         params.append(int(patient_id))
+    if provider_id.isdigit():
+        where.append("o.provider_id=?")
+        params.append(int(provider_id))
     if pay_status in ("paid", "pending"):
         where.append("o.payment_status=?")
         params.append(pay_status)
@@ -169,15 +173,16 @@ def list_ortho():
     ).fetchall()
 
     patients = db.execute("SELECT id, name, cpf FROM patients ORDER BY name ASC").fetchall()
+    providers = db.execute("SELECT id, name FROM providers WHERE active=1 ORDER BY name ASC").fetchall()
 
     return render_template(
         "ortho_list.html",
         rows=rows,
         patients=patients,
+        providers=providers,
         cents_to_brl=cents_to_brl,
-        filters=dict(q=q, patient_id=patient_id, status=pay_status),
+        filters=dict(q=q, patient_id=patient_id, provider_id=provider_id, status=pay_status),
     )
-
 
 @bp.route("/new", methods=["GET", "POST"])
 @login_required

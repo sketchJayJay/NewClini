@@ -15,7 +15,7 @@
 <form class="card shadow-sm border-0 mb-3">
   <div class="card-body">
     <div class="row g-2 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label">Paciente</label>
         <select class="form-select" name="patient_id">
           <option value="">Todos</option>
@@ -32,10 +32,19 @@
           <option value="pending" {% if filters.status=="pending" %}selected{% endif %}>A receber</option>
         </select>
       </div>
-      <div class="col-md-4">
-        <label class="form-label">Busca</label>
-        <input class="form-control" name="q" placeholder="Nome, CPF, manutenção..." value="{{ filters.q }}">
-      </div>
+      <div class="col-md-3">
+  <label class="form-label">Profissionais</label>
+  <select class="form-select" name="provider_id">
+    <option value="">Todos</option>
+    {% for pr in providers %}
+      <option value="{{ pr.id }}" {% if filters.provider_id|int == pr.id %}selected{% endif %}>{{ pr.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="col-md-2">
+  <label class="form-label">Pesquisar</label>
+  <input class="form-control" name="q" placeholder="Paciente, CPF, manutenção..." value="{{ filters.q }}">
+</div>
       <div class="col-md-2">
         <button class="btn btn-outline-secondary w-100">Filtrar</button>
       </div>
