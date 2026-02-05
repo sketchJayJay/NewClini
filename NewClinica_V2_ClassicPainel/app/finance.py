@@ -521,6 +521,53 @@ def provider_toggle(pid: int):
         db.commit()
     return redirect(url_for("finance.providers_list"))
 
+
+@bp.route("/providers/<int:pid>/update", methods=["POST"])
+@login_required
+@finance_required
+def provider_update(pid: int):
+    """Atualiza dados simples do profissional (por enquanto, só % de repasse padrão)."""
+    db = get_db()
+    default_repasse_percent = (request.form.get("default_repasse_percent") or "0").strip()
+    try:
+        drp = max(0, min(100, int(float(default_repasse_percent))))
+    except Exception:
+        drp = 0
+    db.execute("UPDATE providers SET default_repasse_percent=? WHERE id=?", (drp, pid))
+    db.commit()
+    flash("Repasse padrão atualizado ✅", "success")
+    return redirect(url_for("finance.providers_list"))
+
+
+@bp.route("/providers/<int:pid>/delete", methods=["POST"])
+@login_required
+@finance_required
+def provider_delete(pid: int):
+    """Exclui o profissional.
+
+    Observação: como as FKs usam ON DELETE SET NULL, os registros antigos (financeiro/agenda/ortodontia)
+    continuam, porém ficam sem profissional.
+    """
+    db = get_db()
+    # Detecta se já existe histórico ligado (pra avisar)
+    used = False
+    try:
+        used = bool(
+            db.execute("SELECT 1 FROM transactions WHERE provider_id=? LIMIT 1", (pid,)).fetchone()
+            or db.execute("SELECT 1 FROM appointments WHERE provider_id=? LIMIT 1", (pid,)).fetchone()
+            or db.execute("SELECT 1 FROM ortho_maintenances WHERE provider_id=? LIMIT 1", (pid,)).fetchone()
+        )
+    except Exception:
+        used = False
+
+    db.execute("DELETE FROM providers WHERE id=?", (pid,))
+    db.commit()
+    if used:
+        flash("Profissional excluído 🗑️ (o histórico antigo ficará sem profissional)", "warning")
+    else:
+        flash("Profissional excluído 🗑️", "success")
+    return redirect(url_for("finance.providers_list"))
+
 @bp.route("/repasses")
 @login_required
 @finance_required

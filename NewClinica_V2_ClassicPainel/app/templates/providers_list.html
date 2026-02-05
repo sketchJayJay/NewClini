@@ -26,7 +26,15 @@
         <tr>
           <td>{{ r.name }}</td>
           <td>{{ r.role }}</td>
-          <td class="text-end">{{ r.default_repasse_percent }}%</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('finance.provider_update', pid=r.id) }}" class="d-inline">
+              <div class="input-group input-group-sm justify-content-end" style="max-width: 170px; margin-left:auto;">
+                <input type="number" min="0" max="100" step="1" class="form-control text-end" name="default_repasse_percent" value="{{ r.default_repasse_percent }}" title="Repasse padrão (%)">
+                <span class="input-group-text">%</span>
+                <button class="btn btn-outline-primary" title="Salvar repasse">Salvar</button>
+              </div>
+            </form>
+          </td>
           <td>
             {% if r.active %}
               <span class="badge bg-success">Ativo</span>
@@ -35,9 +43,14 @@
             {% endif %}
           </td>
           <td class="text-end">
-            <form method="post" action="{{ url_for('finance.provider_toggle', pid=r.id) }}" class="d-inline">
-              <button class="btn btn-sm btn-outline-secondary">{{ "Desativar" if r.active else "Ativar" }}</button>
-            </form>
+            <div class="d-inline-flex gap-2">
+              <form method="post" action="{{ url_for('finance.provider_toggle', pid=r.id) }}" class="d-inline">
+                <button class="btn btn-sm btn-outline-secondary">{{ "Desativar" if r.active else "Ativar" }}</button>
+              </form>
+              <form method="post" action="{{ url_for('finance.provider_delete', pid=r.id) }}" class="d-inline" onsubmit="return confirm('Excluir este profissional?\n\nAtenção: se ele já tiver agendamentos ou lançamentos, o histórico ficará sem profissional.\nRecomendado: usar Desativar.');">
+                <button class="btn btn-sm btn-outline-danger">Excluir</button>
+              </form>
+            </div>
           </td>
         </tr>
         {% else %}
