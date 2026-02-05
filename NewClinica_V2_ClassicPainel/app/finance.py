@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from .auth import login_required
@@ -574,39 +574,83 @@ def provider_delete(pid: int):
 def repasses():
     db = get_db()
 
-    # Filtro de mês (YYYY-MM). Padrão: mês atual.
+    # Filtros:
+    # - day: YYYY-MM-DD (prioridade)
+    # - week: YYYY-Www (ex.: 2026-W05)
+    # - month: YYYY-MM (padrão)
+    day = (request.args.get("day") or "").strip()
+    week = (request.args.get("week") or "").strip()
     month = (request.args.get("month") or "").strip()
-    try:
-        y, m = month.split("-")
-        y, m = int(y), int(m)
-        month_start_date = date(y, m, 1)
-    except Exception:
-        today = date.today()
-        month = f"{today.year:04d}-{today.month:02d}"
-        month_start_date = date(today.year, today.month, 1)
 
-    # mês seguinte (para filtro < month_end)
-    if month_start_date.month == 12:
-        month_end_date = date(month_start_date.year + 1, 1, 1)
-    else:
-        month_end_date = date(month_start_date.year, month_start_date.month + 1, 1)
+    filter_mode = "month"
+    period_label = ""
+    period_start_date = None
+    period_end_date = None
 
-    month_start = month_start_date.isoformat()
-    month_end = month_end_date.isoformat()
+    # Dia
+    if day:
+        try:
+            d = date.fromisoformat(day)
+            period_start_date = d
+            period_end_date = d + timedelta(days=1)
+            filter_mode = "day"
+            period_label = d.strftime("%d/%m/%Y")
+        except Exception:
+            day = ""
+
+    # Semana ISO (segunda a domingo)
+    if (period_start_date is None) and week:
+        try:
+            y_part, w_part = week.split("-W")
+            y = int(y_part)
+            wk = int(w_part)
+            period_start_date = date.fromisocalendar(y, wk, 1)
+            period_end_date = period_start_date + timedelta(days=7)
+            filter_mode = "week"
+            period_label = f"Semana {wk:02d}/{y}"
+        except Exception:
+            week = ""
+
+    # Mês (padrão)
+    if period_start_date is None:
+        try:
+            y, m = month.split("-")
+            y, m = int(y), int(m)
+            period_start_date = date(y, m, 1)
+        except Exception:
+            today = date.today()
+            month = f"{today.year:04d}-{today.month:02d}"
+            period_start_date = date(today.year, today.month, 1)
+
+        # mês seguinte (para filtro < end)
+        if period_start_date.month == 12:
+            period_end_date = date(period_start_date.year + 1, 1, 1)
+        else:
+            period_end_date = date(period_start_date.year, period_start_date.month + 1, 1)
+
+        filter_mode = "month"
+        period_label = period_start_date.strftime("%m/%Y")
+
+    # Mantém o campo month preenchido (ajuda na UI)
+    if not month:
+        month = f"{period_start_date.year:04d}-{period_start_date.month:02d}"
+
+    period_start = period_start_date.isoformat()
+    period_end = period_end_date.isoformat()
 
     rows = db.execute(
         "SELECT pr.id, pr.name, "
-        "SUM(CASE WHEN t.kind='income' AND t.status='paid' AND t.date>=? AND t.date<? THEN (t.amount_cents*t.repasse_percent)/100 ELSE 0 END) AS repasse_mes, "
+        "SUM(CASE WHEN t.kind='income' AND t.status='paid' AND t.date>=? AND t.date<? THEN (t.amount_cents*t.repasse_percent)/100 ELSE 0 END) AS repasse_periodo, "
         "SUM(CASE WHEN t.kind='income' AND t.status='paid' AND t.repasse_percent>0 AND t.repasse_paid=0 AND t.date>=? AND t.date<? THEN (t.amount_cents*t.repasse_percent)/100 ELSE 0 END) AS repasse_pendente "
         "FROM providers pr "
         "LEFT JOIN transactions t ON t.provider_id=pr.id "
         "WHERE pr.active=1 "
         "GROUP BY pr.id, pr.name "
         "ORDER BY pr.name ASC",
-        (month_start, month_end, month_start, month_end),
+        (period_start, period_end, period_start, period_end),
     ).fetchall()
 
-    # Pendentes do mês selecionado
+    # Pendentes (base: data da ENTRADA)
     pend = db.execute(
         "SELECT t.*, pr.name AS provider_name, p.name AS patient_name "
         "FROM transactions t "
@@ -615,10 +659,10 @@ def repasses():
         "WHERE t.kind='income' AND t.status='paid' AND t.repasse_percent>0 AND t.repasse_paid=0 "
         "AND t.date>=? AND t.date<? "
         "ORDER BY t.date DESC, t.id DESC LIMIT 200",
-        (month_start, month_end),
+        (period_start, period_end),
     ).fetchall()
 
-    # Pagos (repasse marcado) no mês selecionado, mostrando a data do repasse
+    # Pagos (base: data do REPASSE pago)
     paid = db.execute(
         "SELECT t.*, pr.name AS provider_name, p.name AS patient_name "
         "FROM transactions t "
@@ -626,8 +670,8 @@ def repasses():
         "LEFT JOIN patients p ON p.id=t.patient_id "
         "WHERE t.kind='income' AND t.status='paid' AND t.repasse_percent>0 AND t.repasse_paid=1 "
         "AND COALESCE(t.repasse_paid_at, '') >= ? AND COALESCE(t.repasse_paid_at, '') < ? "
-        "ORDER BY t.repasse_paid_at DESC, t.id DESC LIMIT 100",
-        (month_start, month_end),
+        "ORDER BY t.repasse_paid_at DESC, t.id DESC LIMIT 200",
+        (period_start, period_end),
     ).fetchall()
 
     return render_template(
@@ -636,9 +680,14 @@ def repasses():
         pend=pend,
         paid=paid,
         month=month,
+        week=week,
+        day=day,
+        filter_mode=filter_mode,
+        period_label=period_label,
         today=today_yyyy_mm_dd(),
         cents_to_brl=cents_to_brl,
     )
+
 
 @bp.route("/repasses/<int:tid>/pay", methods=["POST"])
 @login_required
@@ -655,8 +704,19 @@ def repasse_pay(tid: int):
     db.commit()
     flash("Repasse marcado como pago ✅", "success")
 
-    # mantém o filtro de mês ao voltar
+    # mantém filtros ao voltar
     month = (request.args.get("month") or request.form.get("month") or "").strip()
+    day = (request.args.get("day") or request.form.get("day") or "").strip()
+    week = (request.args.get("week") or request.form.get("week") or "").strip()
+
+    params = {}
     if month:
-        return redirect(url_for("finance.repasses", month=month))
+        params["month"] = month
+    if day:
+        params["day"] = day
+    if week:
+        params["week"] = week
+
+    return redirect(url_for("finance.repasses", **params))
+
     return redirect(url_for("finance.repasses"))

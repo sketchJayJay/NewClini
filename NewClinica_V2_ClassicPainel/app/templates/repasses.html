@@ -10,26 +10,37 @@
 
 <form method="get" class="row g-2 align-items-end mb-3">
   <div class="col-auto">
+    <label class="form-label small text-muted mb-1">Dia</label>
+    <input type="date" name="day" value="{{ day }}" class="form-control form-control-sm">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">Semana</label>
+    <input type="week" name="week" value="{{ week }}" class="form-control form-control-sm">
+  </div>
+  <div class="col-auto">
     <label class="form-label small text-muted mb-1">Mês</label>
     <input type="month" name="month" value="{{ month }}" class="form-control form-control-sm">
   </div>
-  <div class="col-auto">
+  <div class="col-auto d-flex gap-2">
     <button class="btn btn-sm btn-primary">Filtrar</button>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('finance.repasses') }}">Limpar</a>
+  </div>
+  <div class="col-12">
+    <div class="small text-muted">Filtrando: <b>{{ period_label }}</b> <span class="ms-2">(Dia/Semana tem prioridade)</span></div>
   </div>
 </form>
-</div>
 
 <div class="row g-3">
   <div class="col-lg-5">
     <div class="card shadow-sm border-0">
       <div class="card-body">
-        <h6 class="mb-3">Resumo</h6>
+        <h6 class="mb-3">Resumo <span class="text-muted">({{ period_label }})</span></h6>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead class="table-light">
               <tr>
                 <th>Profissional</th>
-                <th class="text-end">Mês</th>
+                <th class="text-end">Período</th>
                 <th class="text-end">Pendente</th>
               </tr>
             </thead>
@@ -37,7 +48,7 @@
               {% for r in rows %}
               <tr>
                 <td>{{ r.name }}</td>
-                <td class="text-end">R$ {{ cents_to_brl(r.repasse_mes or 0) }}</td>
+                <td class="text-end">R$ {{ cents_to_brl(r.repasse_periodo or 0) }}</td>
                 <td class="text-end"><b>R$ {{ cents_to_brl(r.repasse_pendente or 0) }}</b></td>
               </tr>
               {% else %}
@@ -79,9 +90,11 @@
                 <td style="min-width: 160px">
                   <input type="date" name="paid_at" class="form-control form-control-sm" value="{{ today }}" form="payform{{ t.id }}">
                   <input type="hidden" name="month" value="{{ month }}" form="payform{{ t.id }}">
+                  <input type="hidden" name="day" value="{{ day }}" form="payform{{ t.id }}">
+                  <input type="hidden" name="week" value="{{ week }}" form="payform{{ t.id }}">
                 </td>
                 <td class="text-end" style="width: 140px">
-                  <form id="payform{{ t.id }}" method="post" action="{{ url_for('finance.repasse_pay', tid=t.id, month=month) }}"></form>
+                  <form id="payform{{ t.id }}" method="post" action="{{ url_for('finance.repasse_pay', tid=t.id, month=month, day=day, week=week) }}"></form>
                   <button class="btn btn-sm btn-outline-success" form="payform{{ t.id }}">Marcar pago</button>
                 </td>
               </tr>
@@ -93,7 +106,7 @@
         </div>
 
         <hr class="my-4">
-        <h6 class="mb-3">Pagos no mês (data do repasse)</h6>
+        <h6 class="mb-3">Pagos no período (data do repasse)</h6>
         <div class="table-responsive">
   <table class="table table-sm align-middle">
     <thead class="table-light">
