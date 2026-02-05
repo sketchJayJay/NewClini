@@ -8,6 +8,17 @@
   </div>
 </div>
 
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-auto">
+    <label class="form-label small text-muted mb-1">Mês</label>
+    <input type="month" name="month" value="{{ month }}" class="form-control form-control-sm">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-primary">Filtrar</button>
+  </div>
+</form>
+</div>
+
 <div class="row g-3">
   <div class="col-lg-5">
     <div class="card shadow-sm border-0">
@@ -52,7 +63,8 @@
                 <th>Profissional</th>
                 <th>Paciente</th>
                 <th class="text-end">Repasse</th>
-                <th style="width: 120px"></th>
+                <th>Pago em</th>
+                <th style="width: 140px"></th>
               </tr>
             </thead>
             <tbody>
@@ -64,10 +76,13 @@
                 <td class="text-end">
                   R$ {{ cents_to_brl((t.amount_cents * t.repasse_percent) // 100) }}
                 </td>
-                <td class="text-end">
-                  <form method="post" action="{{ url_for('finance.repasse_pay', tid=t.id) }}">
-                    <button class="btn btn-sm btn-outline-success">Marcar pago</button>
-                  </form>
+                <td style="min-width: 160px">
+                  <input type="date" name="paid_at" class="form-control form-control-sm" value="{{ today }}" form="payform{{ t.id }}">
+                  <input type="hidden" name="month" value="{{ month }}" form="payform{{ t.id }}">
+                </td>
+                <td class="text-end" style="width: 140px">
+                  <form id="payform{{ t.id }}" method="post" action="{{ url_for('finance.repasse_pay', tid=t.id, month=month) }}"></form>
+                  <button class="btn btn-sm btn-outline-success" form="payform{{ t.id }}">Marcar pago</button>
                 </td>
               </tr>
               {% else %}
@@ -75,6 +90,36 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+
+        <hr class="my-4">
+        <h6 class="mb-3">Pagos no mês (data do repasse)</h6>
+        <div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Repasse pago em</th>
+        <th>Data da entrada</th>
+        <th>Profissional</th>
+        <th>Paciente</th>
+        <th class="text-end">Repasse</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in paid %}
+      <tr>
+        <td>{{ t.repasse_paid_at or '—' }}</td>
+        <td>{{ t.date }}</td>
+        <td>{{ t.provider_name }}</td>
+        <td>{{ t.patient_name or '—' }}</td>
+        <td class="text-end">R$ {{ cents_to_brl((t.amount_cents * t.repasse_percent) // 100) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted py-3">Nenhum repasse pago neste mês.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
         </div>
       </div>
     </div>

@@ -104,6 +104,7 @@ def init_db():
         provider_id INTEGER,
         repasse_percent INTEGER NOT NULL DEFAULT 0,
         repasse_paid INTEGER NOT NULL DEFAULT 0,
+        repasse_paid_at TEXT,
         cash_session_id INTEGER,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE SET NULL,
@@ -284,6 +285,7 @@ def init_db():
     """)
     # Migrações leves (bases antigas)
     _ensure_columns(db, "patients", {"cpf": "TEXT", "address": "TEXT", "is_ortho": "INTEGER NOT NULL DEFAULT 0"})
+    _ensure_columns(db, "transactions", {"repasse_paid_at": "TEXT"})
 
     db.commit()
 
