@@ -38,6 +38,9 @@
   <li class="nav-item">
     <a class="nav-link {{ 'active' if tab=='odontograma' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='odontograma') }}">Odontograma</a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='boletos' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='boletos') }}">Boletos</a>
+  </li>
 </ul>
 
 <!-- Resumo sempre visível (igual a versão antiga) -->
@@ -597,6 +600,162 @@
       </div>
     </div>
   </div>
+
+{% endif %}
+
+{% if tab=='boletos' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h6 class="mb-1">Emitir boleto (Asaas)</h6>
+          <div class="text-muted small">Cria a cobrança no Asaas e adiciona automaticamente no Financeiro como <b>A receber</b>.</div>
+        </div>
+        {% if not ASAAS_ENABLED %}
+          <span class="badge text-bg-warning">ASAAS_API_KEY não configurada</span>
+        {% else %}
+          <span class="badge text-bg-secondary">{{ ASAAS_ENV }}</span>
+        {% endif %}
+      </div>
+
+      <form method="post" action="{{ url_for('boletos.create_boleto', pid=patient.id) }}" class="row g-2 mt-2">
+        <div class="col-lg-3">
+          <label class="form-label small mb-1">Valor (R$)</label>
+          <input class="form-control money" name="amount" placeholder="Ex: 150,00" inputmode="decimal" required>
+        </div>
+        <div class="col-lg-3">
+          <label class="form-label small mb-1">Vencimento</label>
+          <input class="form-control" type="date" name="due_date" value="" required>
+        </div>
+        <div class="col-lg-3">
+          <label class="form-label small mb-1">Profissional</label>
+          <select class="form-select" name="provider_id">
+            <option value="">—</option>
+            {% for pr in providers %}
+              <option value="{{ pr.id }}">{{ pr.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-3">
+          <label class="form-label small mb-1">Categoria</label>
+          <select class="form-select" name="category_id">
+            <option value="">Procedimentos</option>
+            {% for c in categories %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label small mb-1">Descrição</label>
+          <input class="form-control" name="description" placeholder="Ex: Clareamento / Parcela 1" maxlength="500">
+        </div>
+
+        <div class="col-12 d-grid">
+          <button class="btn btn-brand">Emitir boleto</button>
+        </div>
+        <div class="text-muted small mt-1">
+          Dica: o Asaas exige <b>CPF</b> do paciente para criar o cliente e emitir boleto.
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="mb-3">Boletos do paciente</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Venc.</th>
+              <th>Status</th>
+              <th>Profissional</th>
+              <th>Descrição</th>
+              <th class="text-end">Valor</th>
+              <th style="width:260px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in boletos %}
+              <tr>
+                <td>{{ b.due_date }}</td>
+                <td>
+                  {% if b.status=='paid' %}
+                    <span class="badge text-bg-success">Pago</span>
+                  {% elif b.status=='overdue' %}
+                    <span class="badge text-bg-danger">Vencido</span>
+                  {% elif b.status=='cancelled' %}
+                    <span class="badge text-bg-secondary">Cancelado</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">A receber</span>
+                  {% endif %}
+                  {% if b.finance_status %}
+                    <div class="text-muted small">Financeiro: {{ b.finance_status }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ b.provider_name or '—' }}</td>
+                <td>{{ b.description or '' }}</td>
+                <td class="text-end">R$ {{ cents_to_brl(b.value_cents) }}</td>
+                <td class="text-end">
+                  {% if b.bank_slip_url %}
+                    <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ b.bank_slip_url }}">PDF</a>
+                  {% endif %}
+                  {% if b.invoice_url %}
+                    <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ b.invoice_url }}">Link</a>
+                  {% endif %}
+                  {% if b.identification_field %}
+                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyText('{{ b.identification_field }}')">Copiar linha</button>
+                  {% endif %}
+                  {% if patient.phone %}
+                    <button class="btn btn-sm btn-success" type="button" onclick="openWa('{{ patient.phone }}','{{ b.invoice_url or b.bank_slip_url }}')">WhatsApp</button>
+                  {% endif %}
+                  {% if ASAAS_ENV != 'production' and b.asaas_payment_id %}
+                    <form method="post" action="{{ url_for('boletos.sandbox_confirm', pid=patient.id, bid=b.id) }}" class="d-inline">
+                      <button class="btn btn-sm btn-outline-primary" type="submit">Confirmar (sandbox)</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="text-center text-muted py-3">Nenhum boleto emitido.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const el = document.querySelector('input[name="due_date"]');
+      if(el && !el.value){
+        el.value = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+      }
+    });
+    function onlyDigits(s){ return (s||'').toString().replace(/\D/g,''); }
+    function waNormalize(phone){
+      let p = onlyDigits(phone);
+      if (!p) return '';
+      if (!p.startsWith('55') && p.length <= 11) p = '55' + p;
+      return p;
+    }
+    function copyText(txt){
+      if(!txt) return;
+      navigator.clipboard.writeText(txt).then(()=>{
+        alert('Copiado ✅');
+      }).catch(()=>{
+        prompt('Copie a linha digitável:', txt);
+      })
+    }
+    function openWa(phone, link){
+      const p = waNormalize(phone);
+      if(!p){ alert('Paciente sem telefone'); return; }
+      const msg = `Olá! Segue o boleto: ${link || ''}`;
+      window.open('https://wa.me/' + p + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+  </script>
 
 {% endif %}
 

@@ -12,7 +12,7 @@ from .utils import cents_to_brl, parse_brl_to_cents
 
 bp = Blueprint("patients", __name__, url_prefix="/patients")
 
-TABS = {"orcamentos", "plano_ficha", "anamnese", "agenda", "odontograma"}
+TABS = {"orcamentos", "plano_ficha", "anamnese", "agenda", "odontograma", "boletos"}
 
 
 def _dtlocal_to_sql(dtlocal: str | None) -> str | None:
@@ -199,11 +199,27 @@ def view_patient(pid: int):
         (pid,),
     ).fetchall()
 
+    # Boletos (carrega quando precisa)
+    boletos = []
+    categories = []
+    if tab == "boletos":
+        boletos = db.execute(
+            "SELECT b.*, pr.name AS provider_name, c.name AS category_name, t.status AS finance_status "
+            "FROM boletos b "
+            "LEFT JOIN providers pr ON pr.id=b.provider_id "
+            "LEFT JOIN categories c ON c.id=b.category_id "
+            "LEFT JOIN transactions t ON t.id=b.finance_tx_id "
+            "WHERE b.patient_id=? ORDER BY b.id DESC",
+            (pid,),
+        ).fetchall()
+        categories = db.execute("SELECT id, name FROM categories WHERE active=1 ORDER BY name ASC").fetchall()
+
     return render_template(
         "patient_view.html",
         patient=patient,
         tab=tab,
         providers=providers,
+        categories=categories,
         budgets=budgets,
         plan=plan,
         records=records,
@@ -212,6 +228,7 @@ def view_patient(pid: int):
         odontos=odontos,
         mapa=mapa,
         tx=tx,
+        boletos=boletos,
         cents_to_brl=cents_to_brl,
         sql_to_br=_sql_to_br,
     )

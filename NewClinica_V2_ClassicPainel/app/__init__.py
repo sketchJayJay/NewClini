@@ -11,11 +11,19 @@ from .finance import bp as finance_bp
 from .agenda import bp as agenda_bp
 from .birthdays import bp as birthdays_bp
 from .ortho import bp as ortho_bp
+from .boletos import bp as boletos_bp
 
 def create_app() -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-production")
     app.config["DB_PATH"] = os.environ.get("DB_PATH", os.path.join(app.instance_path, "newclinica_v2.db"))
+
+    # ===== ASAAS (Boletos) =====
+    # ASAAS_ENV: sandbox|production
+    app.config["ASAAS_ENV"] = (os.environ.get("ASAAS_ENV", "sandbox") or "sandbox").strip().lower()
+    app.config["ASAAS_API_KEY"] = (os.environ.get("ASAAS_API_KEY", "") or "").strip()
+    # Token opcional para validar Webhooks do Asaas (header: asaas-access-token)
+    app.config["ASAAS_WEBHOOK_TOKEN"] = (os.environ.get("ASAAS_WEBHOOK_TOKEN", "") or "").strip()
 
     # Informações da clínica (para impressão de orçamento/anamnese etc.)
     # Pode personalizar no Render/PC via variáveis de ambiente.
@@ -36,7 +44,11 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_flags():
         # Permite usar {{ finance_unlocked }} em qualquer template
-        return {"finance_unlocked": bool(session.get("finance_unlocked"))}
+        return {
+            "finance_unlocked": bool(session.get("finance_unlocked")),
+            "ASAAS_ENV": app.config.get("ASAAS_ENV", "sandbox"),
+            "ASAAS_ENABLED": bool(app.config.get("ASAAS_API_KEY")),
+        }
 
     @app.context_processor
     def inject_clinic_info():
@@ -58,6 +70,7 @@ def create_app() -> Flask:
     app.register_blueprint(agenda_bp)
     app.register_blueprint(birthdays_bp)
     app.register_blueprint(ortho_bp)
+    app.register_blueprint(boletos_bp)
 
     # DB teardown
     app.teardown_appcontext(close_db)

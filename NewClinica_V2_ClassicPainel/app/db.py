@@ -55,6 +55,7 @@ def init_db():
         phone TEXT,
         cpf TEXT,
         address TEXT,
+        asaas_customer_id TEXT,
         is_ortho INTEGER NOT NULL DEFAULT 0,
         birth_date TEXT,
         notes TEXT,
@@ -264,6 +265,43 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_ortho_pay ON ortho_maintenances(payment_status, due_date);
 
 
+    -- ===== BOLETOS (ASAAS) =====
+    CREATE TABLE IF NOT EXISTS boletos(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER NOT NULL,
+        provider_id INTEGER,
+        category_id INTEGER,
+        finance_tx_id INTEGER,
+        asaas_customer_id TEXT,
+        asaas_payment_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending', -- pending|paid|overdue|cancelled|unknown
+        value_cents INTEGER NOT NULL DEFAULT 0,
+        due_date TEXT NOT NULL,
+        description TEXT,
+        bank_slip_url TEXT,
+        invoice_url TEXT,
+        identification_field TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY(provider_id) REFERENCES providers(id) ON DELETE SET NULL,
+        FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+        FOREIGN KEY(finance_tx_id) REFERENCES transactions(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_boletos_patient ON boletos(patient_id);
+    CREATE INDEX IF NOT EXISTS idx_boletos_due ON boletos(due_date);
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_boletos_asaas_payment ON boletos(asaas_payment_id);
+
+    -- Idempotência / duplicação de webhooks (Asaas entrega "at least once")
+    CREATE TABLE IF NOT EXISTS asaas_webhook_events(
+        id TEXT PRIMARY KEY,
+        event TEXT,
+        payment_id TEXT,
+        received_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+
     CREATE TABLE IF NOT EXISTS app_settings(
         key TEXT PRIMARY KEY,
         value TEXT
@@ -284,7 +322,7 @@ def init_db():
 
     """)
     # Migrações leves (bases antigas)
-    _ensure_columns(db, "patients", {"cpf": "TEXT", "address": "TEXT", "is_ortho": "INTEGER NOT NULL DEFAULT 0"})
+    _ensure_columns(db, "patients", {"cpf": "TEXT", "address": "TEXT", "asaas_customer_id": "TEXT", "is_ortho": "INTEGER NOT NULL DEFAULT 0"})
     _ensure_columns(db, "transactions", {"repasse_paid_at": "TEXT"})
 
     db.commit()
