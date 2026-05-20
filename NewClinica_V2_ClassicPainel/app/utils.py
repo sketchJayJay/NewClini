@@ -64,3 +64,48 @@ def cents_to_brl(cents: int | None) -> str:
 def today_yyyy_mm_dd() -> str:
     from datetime import date
     return date.today().isoformat()
+
+def digits_only(s: str | None) -> str:
+    return re.sub(r"\D+", "", s or "")
+
+def validate_cpf(cpf: str) -> bool:
+    cpf = digits_only(cpf)
+    if len(cpf) != 11:
+        return False
+    if cpf == cpf[0] * 11:
+        return False
+    nums = [int(x) for x in cpf]
+    # first digit
+    s1 = sum(nums[i] * (10 - i) for i in range(9))
+    d1 = 0 if (s1 % 11) < 2 else 11 - (s1 % 11)
+    if nums[9] != d1:
+        return False
+    # second digit
+    s2 = sum(nums[i] * (11 - i) for i in range(10))
+    d2 = 0 if (s2 % 11) < 2 else 11 - (s2 % 11)
+    return nums[10] == d2
+
+def validate_cnpj(cnpj: str) -> bool:
+    cnpj = digits_only(cnpj)
+    if len(cnpj) != 14:
+        return False
+    if cnpj == cnpj[0] * 14:
+        return False
+    nums = [int(x) for x in cnpj]
+    w1 = [5,4,3,2,9,8,7,6,5,4,3,2]
+    w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2]
+    s1 = sum(nums[i] * w1[i] for i in range(12))
+    d1 = 0 if (s1 % 11) < 2 else 11 - (s1 % 11)
+    if nums[12] != d1:
+        return False
+    s2 = sum(nums[i] * w2[i] for i in range(13))
+    d2 = 0 if (s2 % 11) < 2 else 11 - (s2 % 11)
+    return nums[13] == d2
+
+def validate_cpf_cnpj(value: str | None) -> bool:
+    d = digits_only(value)
+    if len(d) == 11:
+        return validate_cpf(d)
+    if len(d) == 14:
+        return validate_cnpj(d)
+    return False

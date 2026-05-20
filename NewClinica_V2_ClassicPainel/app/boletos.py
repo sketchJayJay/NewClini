@@ -11,7 +11,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 
 from .auth import login_required
 from .db import get_db
-from .utils import parse_brl_to_cents, cents_to_brl, today_yyyy_mm_dd
+from .utils import parse_brl_to_cents, cents_to_brl, today_yyyy_mm_dd, validate_cpf_cnpj
 
 
 bp = Blueprint("boletos", __name__)
@@ -74,6 +74,8 @@ def _ensure_asaas_customer(db, patient_row) -> str:
     cpf = _digits(_row_get(patient_row, "cpf"))
     if not cpf:
         raise RuntimeError("CPF do paciente é obrigatório para emitir boleto (cadastre no paciente).")
+    if not validate_cpf_cnpj(cpf):
+        raise RuntimeError("CPF/CNPJ do paciente é inválido. Confira os dígitos.")
 
     payload: dict[str, Any] = {
         "name": _row_get(patient_row, "name"),
@@ -147,7 +149,6 @@ def create_boleto(pid: int):
         # cria lançamento pendente no financeiro (só vira "dim dim" quando estiver PAGO)
         repasse_percent = _provider_default_repasse(db, prid)
         # para pendente: usamos date=due_date para ordenar bem no financeiro
-        db.execute("BEGIN")
         db.execute(
             "INSERT INTO transactions(kind,status,date,due_date,amount_cents,payment_method,description,patient_id,category_id,provider_id,repasse_percent) "
             "VALUES('income','pending',?,?,?,?,?,?,?,?,?,?)",
