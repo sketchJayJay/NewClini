@@ -151,7 +151,7 @@ def create_boleto(pid: int):
         # para pendente: usamos date=due_date para ordenar bem no financeiro
         db.execute(
             "INSERT INTO transactions(kind,status,date,due_date,amount_cents,payment_method,description,patient_id,category_id,provider_id,repasse_percent) "
-            "VALUES('income','pending',?,?,?,?,?,?,?,?,?,?)",
+            "VALUES('income','pending',?,?,?,?,?,?,?,?,?)",
             (due_date, due_date, amount_cents, "boleto", f"Boleto • {description}", pid, cid, prid, repasse_percent),
         )
         tx_id = int(db.execute("SELECT last_insert_rowid() AS id").fetchone()["id"])
