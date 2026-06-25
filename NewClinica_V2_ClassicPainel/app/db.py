@@ -293,6 +293,27 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_boletos_due ON boletos(due_date);
     CREATE UNIQUE INDEX IF NOT EXISTS ux_boletos_asaas_payment ON boletos(asaas_payment_id);
 
+    -- ===== CONTRATOS E CONSENTIMENTOS DO PACIENTE =====
+    CREATE TABLE IF NOT EXISTS patient_documents(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER NOT NULL,
+        doc_type TEXT NOT NULL DEFAULT 'contract', -- contract|consent|custom
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        responsible TEXT,
+        status TEXT NOT NULL DEFAULT 'pending', -- pending|signed
+        signed_by TEXT,
+        signed_cpf TEXT,
+        signature_data_url TEXT,
+        signed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_patient_documents_patient ON patient_documents(patient_id);
+    CREATE INDEX IF NOT EXISTS idx_patient_documents_status ON patient_documents(status);
+
     -- Idempotência / duplicação de webhooks (Asaas entrega "at least once")
     CREATE TABLE IF NOT EXISTS asaas_webhook_events(
         id TEXT PRIMARY KEY,
@@ -324,6 +345,13 @@ def init_db():
     # Migrações leves (bases antigas)
     _ensure_columns(db, "patients", {"cpf": "TEXT", "address": "TEXT", "asaas_customer_id": "TEXT", "is_ortho": "INTEGER NOT NULL DEFAULT 0"})
     _ensure_columns(db, "transactions", {"repasse_paid_at": "TEXT"})
+    _ensure_columns(db, "patient_documents", {
+        "responsible": "TEXT",
+        "signed_cpf": "TEXT",
+        "signature_data_url": "TEXT",
+        "signed_at": "TEXT",
+        "updated_at": "TEXT NOT NULL DEFAULT (datetime('now'))",
+    })
 
     db.commit()
 

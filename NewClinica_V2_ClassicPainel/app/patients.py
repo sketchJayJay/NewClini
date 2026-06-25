@@ -12,7 +12,7 @@ from .utils import cents_to_brl, parse_brl_to_cents
 
 bp = Blueprint("patients", __name__, url_prefix="/patients")
 
-TABS = {"orcamentos", "plano_ficha", "anamnese", "agenda", "odontograma", "boletos"}
+TABS = {"orcamentos", "plano_ficha", "anamnese", "agenda", "odontograma", "boletos", "documentos"}
 
 
 def _dtlocal_to_sql(dtlocal: str | None) -> str | None:
@@ -50,6 +50,110 @@ def _sql_to_br(dt_sql: str | None) -> str:
             return dt_sql
     return dt_sql
 
+
+
+DOC_TYPE_LABELS = {
+    "contract": "Contrato de prestação de serviços",
+    "consent": "Termo de consentimento",
+    "custom": "Documento personalizado",
+}
+
+
+def _doc_type_label(doc_type: str | None) -> str:
+    return DOC_TYPE_LABELS.get((doc_type or "custom").strip(), "Documento personalizado")
+
+
+def _default_document_title(doc_type: str | None) -> str:
+    t = (doc_type or "contract").strip()
+    if t == "consent":
+        return "Termo de Consentimento para Tratamento Odontológico"
+    if t == "custom":
+        return "Documento do Paciente"
+    return "Contrato de Prestação de Serviços Odontológicos"
+
+
+def _default_document_content(doc_type: str | None, patient: Any | None = None) -> str:
+    """Modelos editáveis. Não apaga documentos antigos; serve apenas como texto inicial."""
+    name = (patient["name"] if patient and "name" in patient.keys() else "{NOME DO PACIENTE}") or "{NOME DO PACIENTE}"
+    cpf = (patient["cpf"] if patient and "cpf" in patient.keys() else "{CPF}") or "{CPF}"
+    address = (patient["address"] if patient and "address" in patient.keys() else "{ENDEREÇO}") or "{ENDEREÇO}"
+    phone = (patient["phone"] if patient and "phone" in patient.keys() else "{TELEFONE}") or "{TELEFONE}"
+    t = (doc_type or "contract").strip()
+
+    if t == "consent":
+        return f"""TERMO DE CONSENTIMENTO PARA TRATAMENTO ODONTOLÓGICO
+
+Paciente: {name}
+CPF/CNPJ: {cpf}
+Telefone: {phone}
+Endereço: {address}
+
+Declaro que recebi explicações claras sobre o atendimento odontológico proposto, incluindo objetivo, etapas, benefícios esperados, limitações, cuidados necessários, possíveis desconfortos e alternativas existentes.
+
+Autorizo a realização dos procedimentos odontológicos indicados pela equipe profissional, ciente de que o tratamento pode exigir ajustes, novas etapas, retornos e acompanhamento clínico conforme a resposta individual do paciente.
+
+Comprometo-me a informar corretamente sobre meu histórico de saúde, uso de medicamentos, alergias, gestação, doenças pré-existentes e qualquer alteração relevante durante o tratamento.
+
+Estou ciente de que o não comparecimento às consultas, falta de higiene adequada, interrupção do tratamento ou descumprimento das orientações pode comprometer o resultado clínico.
+
+Autorizo o registro das informações necessárias no prontuário do paciente para acompanhamento do tratamento.
+
+Local e data: _______________________________
+
+Paciente/Responsável: _______________________________
+CPF: _______________________________
+Profissional responsável: _______________________________
+"""
+
+    if t == "custom":
+        return f"""DOCUMENTO DO PACIENTE
+
+Paciente: {name}
+CPF/CNPJ: {cpf}
+Telefone: {phone}
+Endereço: {address}
+
+Descreva aqui o conteúdo do documento, autorização, declaração ou observação necessária.
+
+Local e data: _______________________________
+
+Paciente/Responsável: _______________________________
+Profissional responsável: _______________________________
+"""
+
+    return f"""CONTRATO DE PRESTAÇÃO DE SERVIÇOS ODONTOLÓGICOS
+
+Paciente: {name}
+CPF/CNPJ: {cpf}
+Telefone: {phone}
+Endereço: {address}
+
+Pelo presente instrumento, a clínica prestará serviços odontológicos ao paciente acima identificado, conforme avaliação, plano de tratamento, orçamento aprovado e orientações registradas no prontuário.
+
+1. OBJETO
+O presente contrato tem como objeto a prestação de serviços odontológicos, incluindo consultas, procedimentos, manutenções, retornos e demais etapas acordadas entre as partes.
+
+2. VALORES E PAGAMENTOS
+Os valores, condições de pagamento, parcelas, boletos e vencimentos serão registrados no sistema financeiro da clínica e/ou em orçamento próprio aprovado pelo paciente ou responsável.
+
+3. RESPONSABILIDADES DO PACIENTE
+O paciente/responsável compromete-se a comparecer às consultas agendadas, cumprir orientações profissionais, informar dados de saúde verdadeiros e manter os pagamentos acordados em dia.
+
+4. REMARCAÇÕES E FALTAS
+Remarcações devem ser solicitadas com antecedência sempre que possível. Faltas e atrasos podem impactar o prazo e a continuidade do tratamento.
+
+5. PRONTUÁRIO E REGISTROS
+As informações clínicas, financeiras e administrativas necessárias serão registradas para acompanhamento do tratamento e organização da clínica.
+
+6. ACEITE
+Após leitura, o paciente/responsável declara estar ciente e de acordo com as condições acima.
+
+Local e data: _______________________________
+
+Paciente/Responsável: _______________________________
+CPF: _______________________________
+Profissional responsável: _______________________________
+"""
 
 
 def _parse_date_input(s: str | None) -> str | None:
@@ -214,6 +318,22 @@ def view_patient(pid: int):
         ).fetchall()
         categories = db.execute("SELECT id, name FROM categories WHERE active=1 ORDER BY name ASC").fetchall()
 
+    # Contratos e termos (carrega quando precisa)
+    documents = []
+    doc_defaults = {}
+    if tab == "documentos":
+        documents = db.execute(
+            "SELECT * FROM patient_documents WHERE patient_id=? ORDER BY id DESC",
+            (pid,),
+        ).fetchall()
+        doc_defaults = {
+            key: {
+                "title": _default_document_title(key),
+                "content": _default_document_content(key, patient),
+            }
+            for key in ("contract", "consent", "custom")
+        }
+
     return render_template(
         "patient_view.html",
         patient=patient,
@@ -229,6 +349,9 @@ def view_patient(pid: int):
         mapa=mapa,
         tx=tx,
         boletos=boletos,
+        documents=documents,
+        doc_defaults=doc_defaults,
+        doc_type_label=_doc_type_label,
         cents_to_brl=cents_to_brl,
         sql_to_br=_sql_to_br,
     )
@@ -607,6 +730,154 @@ def anamnesis_print(pid: int, aid: int):
         flash("Anamnese não encontrada.", "danger")
         return redirect(url_for("patients.view_patient", pid=pid, tab="anamnese"))
     return render_template("anamnesis_print.html", patient=patient, rec=rec, sql_to_br=_sql_to_br)
+
+
+# =========================
+# Contratos e consentimentos
+# =========================
+
+@bp.post("/<int:pid>/documents/add")
+@login_required
+def document_add(pid: int):
+    f = request.form
+    doc_type = (f.get("doc_type") or "contract").strip()
+    if doc_type not in DOC_TYPE_LABELS:
+        doc_type = "custom"
+    title = (f.get("title") or "").strip() or _default_document_title(doc_type)
+    responsible = (f.get("responsible") or "").strip() or None
+    content = (f.get("content") or "").strip()
+
+    db = get_db()
+    patient = db.execute("SELECT * FROM patients WHERE id=?", (pid,)).fetchone()
+    if not patient:
+        flash("Paciente não encontrado.", "danger")
+        return redirect(url_for("patients.list_patients"))
+    if not content:
+        content = _default_document_content(doc_type, patient)
+
+    db.execute(
+        "INSERT INTO patient_documents(patient_id, doc_type, title, content, responsible, status) "
+        "VALUES(?,?,?,?,?, 'pending')",
+        (pid, doc_type, title, content, responsible),
+    )
+    db.commit()
+    flash("Documento criado ✅", "success")
+    return redirect(url_for("patients.view_patient", pid=pid, tab="documentos"))
+
+
+@bp.get("/<int:pid>/documents/<int:did>")
+@login_required
+def document_view(pid: int, did: int):
+    db = get_db()
+    patient = db.execute("SELECT * FROM patients WHERE id=?", (pid,)).fetchone()
+    doc = db.execute(
+        "SELECT * FROM patient_documents WHERE id=? AND patient_id=?",
+        (did, pid),
+    ).fetchone()
+    if not patient or not doc:
+        flash("Documento não encontrado.", "danger")
+        return redirect(url_for("patients.view_patient", pid=pid, tab="documentos"))
+    return render_template(
+        "document_view.html",
+        patient=patient,
+        doc=doc,
+        doc_type_label=_doc_type_label,
+        sql_to_br=_sql_to_br,
+    )
+
+
+@bp.post("/<int:pid>/documents/<int:did>/update")
+@login_required
+def document_update(pid: int, did: int):
+    f = request.form
+    title = (f.get("title") or "").strip()
+    responsible = (f.get("responsible") or "").strip() or None
+    content = (f.get("content") or "").strip()
+    if not title or not content:
+        flash("Título e conteúdo são obrigatórios.", "danger")
+        return redirect(url_for("patients.document_view", pid=pid, did=did))
+
+    db = get_db()
+    doc = db.execute(
+        "SELECT id FROM patient_documents WHERE id=? AND patient_id=?",
+        (did, pid),
+    ).fetchone()
+    if not doc:
+        flash("Documento não encontrado.", "danger")
+        return redirect(url_for("patients.view_patient", pid=pid, tab="documentos"))
+
+    db.execute(
+        "UPDATE patient_documents SET title=?, responsible=?, content=?, updated_at=datetime('now') "
+        "WHERE id=? AND patient_id=?",
+        (title, responsible, content, did, pid),
+    )
+    db.commit()
+    flash("Documento atualizado ✅", "success")
+    return redirect(url_for("patients.document_view", pid=pid, did=did))
+
+
+@bp.post("/<int:pid>/documents/<int:did>/sign")
+@login_required
+def document_sign(pid: int, did: int):
+    f = request.form
+    signed_by = (f.get("signed_by") or "").strip()
+    signed_cpf = (f.get("signed_cpf") or "").strip() or None
+    signature_data_url = (f.get("signature_data_url") or "").strip()
+    if not signed_by:
+        flash("Informe o nome de quem está assinando.", "danger")
+        return redirect(url_for("patients.document_view", pid=pid, did=did))
+    if not signature_data_url.startswith("data:image/png;base64,"):
+        flash("Assinatura digital não preenchida. Assine no quadro antes de salvar.", "danger")
+        return redirect(url_for("patients.document_view", pid=pid, did=did))
+
+    db = get_db()
+    doc = db.execute(
+        "SELECT id FROM patient_documents WHERE id=? AND patient_id=?",
+        (did, pid),
+    ).fetchone()
+    if not doc:
+        flash("Documento não encontrado.", "danger")
+        return redirect(url_for("patients.view_patient", pid=pid, tab="documentos"))
+
+    db.execute(
+        "UPDATE patient_documents SET status='signed', signed_by=?, signed_cpf=?, signature_data_url=?, signed_at=datetime('now'), updated_at=datetime('now') "
+        "WHERE id=? AND patient_id=?",
+        (signed_by, signed_cpf, signature_data_url, did, pid),
+    )
+    db.commit()
+    flash("Documento assinado digitalmente ✅", "success")
+    return redirect(url_for("patients.document_view", pid=pid, did=did))
+
+
+@bp.get("/<int:pid>/documents/<int:did>/print")
+@login_required
+def document_print(pid: int, did: int):
+    db = get_db()
+    patient = db.execute("SELECT * FROM patients WHERE id=?", (pid,)).fetchone()
+    doc = db.execute(
+        "SELECT * FROM patient_documents WHERE id=? AND patient_id=?",
+        (did, pid),
+    ).fetchone()
+    if not patient or not doc:
+        flash("Documento não encontrado.", "danger")
+        return redirect(url_for("patients.view_patient", pid=pid, tab="documentos"))
+    return render_template(
+        "document_print.html",
+        patient=patient,
+        doc=doc,
+        doc_type_label=_doc_type_label,
+        sql_to_br=_sql_to_br,
+    )
+
+
+@bp.post("/<int:pid>/documents/<int:did>/delete")
+@login_required
+def document_delete(pid: int, did: int):
+    db = get_db()
+    db.execute("DELETE FROM patient_documents WHERE id=? AND patient_id=?", (did, pid))
+    db.commit()
+    flash("Documento removido.", "info")
+    return redirect(url_for("patients.view_patient", pid=pid, tab="documentos"))
 
 
 # =========================

@@ -41,6 +41,9 @@
   <li class="nav-item">
     <a class="nav-link {{ 'active' if tab=='boletos' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='boletos') }}">Boletos</a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='documentos' else '' }}" href="{{ url_for('patients.view_patient', pid=patient.id, tab='documentos') }}">Contratos/Consentimentos</a>
+  </li>
 </ul>
 
 <!-- Resumo sempre visível (igual a versão antiga) -->
@@ -755,6 +758,112 @@
       const msg = `Olá! Segue o boleto: ${link || ''}`;
       window.open('https://wa.me/' + p + '?text=' + encodeURIComponent(msg), '_blank');
     }
+  </script>
+
+{% endif %}
+
+
+{% if tab=='documentos' %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+          <h6 class="mb-1">Contratos e termos de consentimento</h6>
+          <div class="text-muted small">Crie o documento, imprima para assinatura manual ou peça assinatura digital direto na tela.</div>
+        </div>
+        <span class="badge text-bg-light border text-muted">Paciente: {{ patient.name }}</span>
+      </div>
+
+      <form method="post" action="{{ url_for('patients.document_add', pid=patient.id) }}" class="row g-2" id="docForm">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Tipo</label>
+          <select class="form-select" name="doc_type" id="docType">
+            <option value="contract">Contrato</option>
+            <option value="consent">Termo de consentimento</option>
+            <option value="custom">Personalizado</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Título</label>
+          <input class="form-control" name="title" id="docTitle" value="{{ doc_defaults.contract.title if doc_defaults else 'Contrato de Prestação de Serviços Odontológicos' }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Profissional responsável</label>
+          <input class="form-control" name="responsible" placeholder="Nome do dentista/responsável">
+        </div>
+        <div class="col-12">
+          <label class="form-label small text-muted">Texto do documento</label>
+          <textarea class="form-control" name="content" id="docContent" rows="12" required>{{ doc_defaults.contract.content if doc_defaults else '' }}</textarea>
+          <div class="text-muted small mt-1">Você pode editar o modelo antes de salvar. Isso não altera documentos antigos.</div>
+        </div>
+        <div class="col-12 d-grid">
+          <button class="btn btn-brand">Criar documento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="mb-3">Documentos do paciente</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>Título</th>
+              <th>Status</th>
+              <th>Assinado em</th>
+              <th style="width:280px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in documents %}
+            <tr>
+              <td>{{ sql_to_br(d.created_at) }}</td>
+              <td>{{ doc_type_label(d.doc_type) }}</td>
+              <td>{{ d.title }}</td>
+              <td>
+                {% if d.status == 'signed' %}
+                  <span class="badge text-bg-success">Assinado</span>
+                {% else %}
+                  <span class="badge text-bg-warning">Pendente</span>
+                {% endif %}
+              </td>
+              <td>{{ sql_to_br(d.signed_at) if d.signed_at else '—' }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.document_view', pid=patient.id, did=d.id) }}">Abrir/Assinar</a>
+                <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('patients.document_print', pid=patient.id, did=d.id) }}">Imprimir</a>
+                <form method="post" action="{{ url_for('patients.document_delete', pid=patient.id, did=d.id) }}" class="d-inline" onsubmit="return confirm('Excluir este documento?')">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Excluir</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-3">Nenhum contrato ou termo criado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const docDefaults = {{ doc_defaults|tojson }};
+    const typeEl = document.getElementById('docType');
+    const titleEl = document.getElementById('docTitle');
+    const contentEl = document.getElementById('docContent');
+    let editedContent = false;
+    let editedTitle = false;
+    contentEl?.addEventListener('input', () => editedContent = true);
+    titleEl?.addEventListener('input', () => editedTitle = true);
+    typeEl?.addEventListener('change', () => {
+      const d = docDefaults[typeEl.value] || docDefaults.contract;
+      if (!editedTitle) titleEl.value = d.title;
+      if (!editedContent || !contentEl.value.trim()) contentEl.value = d.content;
+    });
   </script>
 
 {% endif %}
