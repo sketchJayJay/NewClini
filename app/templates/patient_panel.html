@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+{% set title = p.name %}
+{% block content %}
+
+<!-- Painel do Paciente (modo clássico) -->
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --text:#111111; --muted:#6b7280;
+    --primary:#2563eb; --primary-contrast:#ffffff; --border:#e5e7eb;
+    --danger:#dc2626; --shadow:0 6px 20px rgba(0,0,0,.08);
+  }
+  html{ color-scheme: light !important; }
+  body{ background:var(--bg) !important; color:var(--text) !important; }
+  main.container{ max-width: 1200px; }
+
+  .card{
+    background:var(--card) !important; color:var(--text) !important;
+    border:1px solid var(--border) !important; border-radius:14px !important; padding:14px !important;
+    box-shadow:var(--shadow) !important;
+  }
+  .section-title{ font-weight:600; font-size:18px; color:var(--text); margin:6px 0 10px 0; }
+  .muted{ color:var(--muted); }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:8px 12px; border-radius:10px; border:1px solid transparent;
+    background:var(--primary); color:var(--primary-contrast); text-decoration:none; cursor:pointer;
+  }
+  .btn.small{ padding:6px 10px; font-size:13px; }
+  .btn.tiny{ padding:4px 8px; font-size:12px; }
+  .btn.primary{ background:var(--primary); }
+  .btn.danger{ background:var(--danger); }
+  .btn.active{ filter:brightness(0.95); }
+
+  .field{
+    background:#fff; color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:8px 10px; min-height:36px;
+  }
+  .table{ width:100%; border-collapse:collapse; }
+  .table th, .table td{ border-bottom:1px solid var(--border); padding:10px; text-align:left; vertical-align:top; }
+  .table th{ background:#f9fafb; color:#111; font-weight:600; }
+  .badge{ background:#eef2ff; color:#1d4ed8; padding:4px 8px; border-radius:999px; font-size:12px; }
+
+  .ph-header{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .tabs{ display:flex; gap:8px; margin:10px 0 14px; flex-wrap:wrap; }
+  .avatar-xl{
+    width:52px;height:52px;border-radius:50%;
+    background:#e5edff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:22px;
+  }
+
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  @media(max-width:980px){ .grid2{ grid-template-columns:1fr; } }
+  .flex{ display:flex; }
+  .gap{ gap:10px }
+
+  @media print{
+    nav, .navbar, .tabs, .btn, .alert { display:none !important; }
+    #odontograma-wrap { page-break-inside: avoid; }
+    body { background:#fff !important; }
+    .card { border:none !important; box-shadow:none !important; }
+  }
+</style>
+
+<div class="card ph-header">
+  <div class="flex gap" style="align-items:center;">
+    <div class="avatar-xl">{{ p.name[0]|upper }}</div>
+    <div>
+      <div class="section-title" style="margin-bottom:2px">{{ p.name }}</div>
+      <div class="muted">{{ p.phone or '' }}{% if p.email %} • {{ p.email }}{% endif %}</div>
+      <div class="muted" style="font-size:13px">Nascimento: {{ p.birth_date or '—' }}</div>
+    </div>
+  </div>
+  <a class="btn" href="{{ url_for('patients.list_patients') }}">Voltar</a>
+</div>
+
+<div class="tabs">
+  {% set t = tab or 'orcamentos' %}
+  <a class="btn {{ 'active' if t=='orcamentos' else '' }}" href="{{ url_for('patients.view_patient', pid=p.id, tab='orcamentos') }}">Orçamentos</a>
+  <a class="btn {{ 'active' if t=='plano_ficha' else '' }}" href="{{ url_for('patients.view_patient', pid=p.id, tab='plano_ficha') }}">Plano/Ficha</a>
+  <a class="btn {{ 'active' if t=='anamnese' else '' }}" href="{{ url_for('patients.view_patient', pid=p.id, tab='anamnese') }}">Anamnese</a>
+  <a class="btn {{ 'active' if t=='agenda' else '' }}" href="{{ url_for('patients.view_patient', pid=p.id, tab='agenda') }}">Agenda</a>
+  <a class="btn {{ 'active' if t=='odontograma' else '' }}" href="{{ url_for('patients.view_patient', pid=p.id, tab='odontograma') }}">Odontograma</a>
+</div>
+
+{% if t=='orcamentos' %}
+  <div class="card" style="margin-bottom:12px">
+    <div class="section-title">Novo orçamento</div>
+    <form method="post" action="{{ url_for('patients.budget_add', pid=p.id) }}" class="grid2" style="align-items:end">
+      <input class="field" name="description" placeholder="Descrição do procedimento" required>
+      <input class="field" name="amount" type="text" step="0.01" placeholder="Valor (R$)" required inputmode="decimal" pattern="[0-9.,]+">
+      <button class="btn primary" style="grid-column: 1 / -1">Adicionar</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr>
+      </thead>
+      <tbody>
+        {% for b in orcamentos %}
+          <tr>
+            <td>{{ b.description }}</td>
+            <td>
+              {% if b.created_at %}
+                {{ b.created_at[8:10] }}/{{ b.created_at[5:7] }}/{{ b.created_at[0:4] }}
+              {% endif %}
+            </td>
+            <td>R$ {{ '%.2f'|format(b.amount) }}</td>
+            <td><span class="badge">{{ b.status }}</span></td>
+            <td class="flex gap" style="flex-wrap:wrap">
+              <a class="btn small" target="_blank" href="{{ url_for('patients.budget_print', pid=p.id, bid=b.id) }}">🖨️ Imprimir</a>
+              {% if b.status!='aprovado' %}
+                <a class="btn small" href="{{ url_for('patients.budget_status', pid=p.id, bid=b.id, s='aprovado') }}">Aprovar</a>
+                <a class="btn small danger" href="{{ url_for('patients.budget_status', pid=p.id, bid=b.id, s='reprovado') }}">Reprovar</a>
+              {% else %}
+                <span class="muted" style="align-self:center">aprovado</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="muted">Sem orçamentos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% elif t=='plano_ficha' %}
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="section-title">Plano do paciente (entra automaticamente ao aprovar orçamento)</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Procedimento</th><th>Dente</th><th>Valor</th><th>Criado em</th><th>Feito em</th><th>Feito?</th><th>Etapas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in plano %}
+          <tr>
+            <td>{{ it.procedure }}</td>
+            <td>{{ it.tooth or '-' }}</td>
+            <td>R$ {{ '%.2f'|format(it.amount) }}</td>
+            <td>
+              {% if it.created_at %}
+                {{ it.created_at[8:10] }}/{{ it.created_at[5:7] }}/{{ it.created_at[0:4] }}
+              {% endif %}
+            </td>
+            <td>
+              {% if it.done and it.done_at %}
+                {{ it.done_at[8:10] }}/{{ it.done_at[5:7] }}/{{ it.done_at[0:4] }}
+              {% endif %}
+            </td>
+            <td>
+              {% if it.done %}
+                ✅
+                <a class="btn tiny" href="{{ url_for('patients.plan_toggle', pid=p.id, iid=it.id) }}">desfazer</a>
+              {% else %}
+                <a class="btn small" href="{{ url_for('patients.plan_toggle', pid=p.id, iid=it.id) }}">Marcar feito</a>
+              {% endif %}
+            </td>
+            <td>
+              {% set etapas = it.steps if it.steps is defined else [] %}
+              <ul style="margin:6px 0 10px 0; padding-left:18px">
+                {% for st in etapas %}
+                  <li style="margin:4px 0">
+                    {% if st.done %}✅{% else %}🔲{% endif %}
+                    {{ st.step }}
+                    <small class="muted">
+                      {% if st.done and st.done_at %}
+                        (feito em {{ st.done_at[8:10] }}/{{ st.done_at[5:7] }}/{{ st.done_at[0:4] }})
+                      {% elif st.created_at %}
+                        (criada em {{ st.created_at[8:10] }}/{{ st.created_at[5:7] }}/{{ st.created_at[0:4] }})
+                      {% endif %}
+                    </small>
+                    <a class="btn tiny" href="{{ url_for('patients.plan_step_toggle', pid=p.id, sid=st.id) }}">alternar</a>
+                  </li>
+                {% else %}
+                  <li class="muted">Sem etapas.</li>
+                {% endfor %}
+              </ul>
+
+              <form method="post" action="{{ url_for('patients.plan_add_step', pid=p.id, iid=it.id) }}" class="flex" style="gap:6px">
+                <input class="field" name="step" placeholder="Nova etapa (ex.: anestesia, preparo...)" required>
+                <button class="btn tiny">+</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="muted">Sem itens no plano.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="section-title">Ficha Clínica</div>
+    <form method="post" action="{{ url_for('patients.record_save', pid=p.id) }}">
+      <div class="grid2">
+        <label>Queixa principal
+          <input class="field" name="queixa" placeholder="Motivo da consulta">
+        </label>
+        <label>Responsável / Profissional
+          <input class="field" name="responsavel" placeholder="Nome do responsável">
+        </label>
+        <label>Histórico / Evolução
+          <textarea class="field" name="historico"></textarea>
+        </label>
+        <div></div>
+        <label>Exame extraoral
+          <textarea class="field" name="exames_extra"></textarea>
+        </label>
+        <label>Exame intraoral
+          <textarea class="field" name="exames_intra"></textarea>
+        </label>
+        <label>Sinais vitais — PA (mmHg)
+          <input class="field" name="sinais_pa" placeholder="ex.: 120/80">
+        </label>
+        <label>Sinais vitais — FC (bpm)
+          <input class="field" name="sinais_fc" placeholder="ex.: 72">
+        </label>
+        <label>Diagnóstico
+          <textarea class="field" name="diagnostico"></textarea>
+        </label>
+        <label>Conduta / Plano imediato
+          <textarea class="field" name="conduta"></textarea>
+        </label>
+      </div>
+      <button class="btn primary" style="margin-top:10px">Salvar Ficha</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Histórico de Fichas</div>
+    <table class="table">
+      <thead><tr><th>Data</th><th>Queixa</th><th>Profissional</th><th></th></tr></thead>
+      <tbody>
+        {% for r in fichas %}
+          <tr>
+            <td>{{ r.created_at }}</td>
+            <td>{{ (r.queixa or '')[0:60] }}</td>
+            <td>{{ r.responsavel or '-' }}</td>
+            <td style="text-align:right">
+              <a class="btn small" href="{{ url_for('patients.record_view', pid=p.id, rid=r.id) }}">Ver</a>
+              <a class="btn small" href="{{ url_for('patients.record_print', pid=p.id, rid=r.id) }}" target="_blank">Imprimir</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="muted">Sem fichas registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+
+{% elif t=='anamnese' %}
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="section-title">Anamnese</div>
+
+    <form method="post" action="{{ url_for('patients.anamnesis_save', pid=p.id) }}" class="grid2">
+      <label>Profissional / Responsável
+        <input class="field" name="responsavel" placeholder="Nome de quem preencheu">
+      </label>
+      <label>Queixa principal
+        <input class="field" name="queixa" placeholder="Motivo da consulta">
+      </label>
+      <label>Alergias
+        <textarea class="field" name="alergias"></textarea>
+      </label>
+      <label>Medicamentos em uso
+        <textarea class="field" name="medicamentos"></textarea>
+      </label>
+      <label>Doenças / Condições
+        <textarea class="field" name="doencas"></textarea>
+      </label>
+      <label>Histórico médico (resumo)
+        <textarea class="field" name="historico_medico"></textarea>
+      </label>
+      <label>Cirurgias / Procedimentos prévios
+        <textarea class="field" name="cirurgias"></textarea>
+      </label>
+      <label>Reação a anestesia / medicamentos
+        <textarea class="field" name="anestesia_reacao"></textarea>
+      </label>
+      <label>Sangramento / anticoagulantes
+        <textarea class="field" name="sangramento"></textarea>
+      </label>
+      <label>Gestante
+        <select class="field" name="gestante">
+          <option value="">—</option>
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+          <option value="nao_aplica">Não se aplica</option>
+        </select>
+      </label>
+      <label>Fumante
+        <select class="field" name="fumante">
+          <option value="">—</option>
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+          <option value="ocasional">Ocasional</option>
+        </select>
+      </label>
+      <label>Álcool
+        <select class="field" name="alcool">
+          <option value="">—</option>
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+          <option value="social">Social</option>
+        </select>
+      </label>
+
+      <div style="grid-column: 1 / -1;">
+        <div class="muted" style="font-size:13px; margin-bottom:6px">Marque se o paciente possui:</div>
+        <label style="margin-right:12px"><input type="checkbox" name="hipertensao" value="1"> Hipertensão</label>
+        <label style="margin-right:12px"><input type="checkbox" name="diabetes" value="1"> Diabetes</label>
+        <label style="margin-right:12px"><input type="checkbox" name="cardiaco" value="1"> Cardíaco</label>
+        <label style="margin-right:12px"><input type="checkbox" name="hepatite" value="1"> Hepatite</label>
+        <label style="margin-right:12px"><input type="checkbox" name="hiv" value="1"> HIV</label>
+      </div>
+
+      <label style="grid-column: 1 / -1;">Observações
+        <textarea class="field" name="observacoes"></textarea>
+      </label>
+
+      <button class="btn primary" style="grid-column: 1 / -1">Salvar Anamnese</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Histórico de Anamneses</div>
+    <table class="table">
+      <thead><tr><th>Data</th><th>Queixa</th><th>Profissional</th><th></th></tr></thead>
+      <tbody>
+        {% for a in anamneses %}
+          <tr>
+            <td>{{ a.created_at }}</td>
+            <td>{{ (a.queixa or '')[0:60] }}</td>
+            <td>{{ a.responsavel or '-' }}</td>
+            <td style="text-align:right">
+              <a class="btn small" href="{{ url_for('patients.anamnesis_view', pid=p.id, aid=a.id) }}">Ver</a>
+              <a class="btn small" href="{{ url_for('patients.anamnesis_print', pid=p.id, aid=a.id) }}" target="_blank">Imprimir</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="muted">Sem anamnese registrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% elif t=='agenda' %}
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="section-title">Agenda do Paciente</div>
+    <form method="post" action="{{ url_for('patients.appointment_add', pid=p.id) }}" class="grid2">
+      <div>
+        <label class="muted" style="font-size:13px">Data e hora</label>
+        <input class="field" type="datetime-local" name="start_at" required>
+      </div>
+      <div>
+        <label class="muted" style="font-size:13px">Profissional</label>
+        <select class="field" name="provider_id" required>
+          <option value="">Selecione</option>
+          {% for d in doctors %}
+            <option value="{{ d.id }}">{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="muted" style="font-size:13px">Título</label>
+        <input class="field" type="text" name="title" value="Consulta">
+      </div>
+      <div>
+        <label class="muted" style="font-size:13px">Observações</label>
+        <input class="field" type="text" name="note" placeholder="Observações (opcional)">
+      </div>
+
+      <div style="display:flex;align-items:flex-end;gap:8px; grid-column: 1 / -1;">
+        <button class="btn primary" style="margin-top:6px">Salvar agendamento</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Agendamentos deste paciente</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Data / Hora</th>
+          <th>Profissional</th>
+          <th>Título</th>
+          <th>Obs.</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in appts %}
+          <tr>
+            <td>{{ a.start_at }}</td>
+            <td>{{ a.doctor_name or '-' }}</td>
+            <td>{{ a.title }}</td>
+            <td>{{ a.note or '' }}</td>
+            <td style="text-align:right">
+              <form method="post" action="{{ url_for('patients.appointment_delete', pid=p.id, aid=a.id) }}" onsubmit="return confirm('Excluir este agendamento?')">
+                <button class="btn small danger" type="submit">Excluir</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="5" class="muted">Nenhum agendamento para este paciente.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% elif t=='odontograma' %}
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="section-title">Odontograma</div>
+    <div class="flex" style="justify-content:flex-end; gap:8px; margin:8px 0 4px">
+      <button class="btn" type="button" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
+    {% include 'partials/odontograma_inline.html' %}
+  </div>
+
+  <div class="card">
+    <div class="muted" style="margin-bottom:6px; font-size:13px">Registros salvos</div>
+    <table class="table" id="odontograma-table">
+      <thead><tr><th>Dente</th><th>Status</th><th>Obs.</th><th>Atualizado</th></tr></thead>
+      <tbody id="odontograma-tbody">
+        {% for o in odontos %}
+          <tr>
+            <td>{{ o.tooth }}</td>
+            <td>{{ o.status }}</td>
+            <td>{{ o.note or '' }}</td>
+            <td>{{ o.updated_at }}</td>
+          </tr>
+        {% else %}
+          <tr data-empty="1"><td colspan="4" class="muted">Sem registros.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% endif %}
+
+{% endblock %}

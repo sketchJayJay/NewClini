@@ -1,0 +1,4 @@
+{# partials/_flash.html #}
+{% for cat, msg in get_flashed_messages(with_categories=True) %}
+  <div class="alert {{ cat|default('info') }}" role="alert">{{ msg }}</div>
+{% endfor %}

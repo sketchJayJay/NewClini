@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set title = "Anamnese - " ~ patient.name %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Anamnese</h4>
+    <div class="text-muted small">{{ patient.name }} · {{ sql_to_br(rec.created_at) }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('patients.view_patient', pid=patient.id, tab='anamnese') }}">Voltar</a>
+    <a class="btn btn-outline-secondary" target="_blank" href="{{ url_for('patients.anamnesis_print', pid=patient.id, aid=rec.id) }}">Imprimir</a>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="text-muted small">Queixa principal</div>
+        <div><b>{{ rec.queixa or "—" }}</b></div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Profissional / Responsável</div>
+        <div><b>{{ rec.responsavel or "—" }}</b></div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="text-muted small">Alergias</div>
+        <div style="white-space:pre-wrap">{{ rec.alergias or "—" }}</div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-muted small">Medicamentos em uso</div>
+        <div style="white-space:pre-wrap">{{ rec.medicamentos or "—" }}</div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-muted small">Doenças / Condições</div>
+        <div style="white-space:pre-wrap">{{ rec.doencas or "—" }}</div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="text-muted small">Histórico médico (resumo)</div>
+        <div style="white-space:pre-wrap">{{ rec.historico_medico or "—" }}</div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Cirurgias / Procedimentos prévios</div>
+        <div style="white-space:pre-wrap">{{ rec.cirurgias or "—" }}</div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="text-muted small">Reação a anestesia / medicamentos</div>
+        <div style="white-space:pre-wrap">{{ rec.anestesia_reacao or "—" }}</div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Sangramento / anticoagulantes</div>
+        <div style="white-space:pre-wrap">{{ rec.sangramento or "—" }}</div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="text-muted small">Gestante</div>
+        <div><b>{{ rec.gestante or "—" }}</b></div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-muted small">Fumante</div>
+        <div><b>{{ rec.fumante or "—" }}</b></div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-muted small">Álcool</div>
+        <div><b>{{ rec.alcool or "—" }}</b></div>
+      </div>
+
+      <div class="col-12">
+        <div class="text-muted small mb-1">Condições marcadas</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% if rec.hipertensao %}<span class="badge text-bg-secondary">Hipertensão</span>{% endif %}
+          {% if rec.diabetes %}<span class="badge text-bg-secondary">Diabetes</span>{% endif %}
+          {% if rec.cardiaco %}<span class="badge text-bg-secondary">Cardíaco</span>{% endif %}
+          {% if rec.hepatite %}<span class="badge text-bg-secondary">Hepatite</span>{% endif %}
+          {% if rec.hiv %}<span class="badge text-bg-secondary">HIV</span>{% endif %}
+          {% if not (rec.hipertensao or rec.diabetes or rec.cardiaco or rec.hepatite or rec.hiv) %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="text-muted small">Observações</div>
+        <div style="white-space:pre-wrap">{{ rec.observacoes or "—" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

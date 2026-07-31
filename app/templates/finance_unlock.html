@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% set title = "Desbloquear Financeiro" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4">
+        <h4 class="mb-1">Financeiro bloqueado 🔒</h4>
+        <div class="text-muted small mb-3">Digite a senha do Financeiro para acessar lançamentos, caixa e repasses.</div>
+
+        <form method="post">
+          <input type="hidden" name="next" value="{{ next }}">
+          <label class="form-label">Senha do Financeiro</label>
+          <input type="password" class="form-control" name="password" placeholder="Senha" autofocus required>
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-brand flex-grow-1" type="submit">Entrar</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.index') }}">Voltar</a>
+          </div>
+        </form>
+
+        <div class="mt-3 text-muted small">
+          Dica: você pode trocar a senha na nuvem usando a variável de ambiente <b>FINANCE_PASSWORD</b>.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
