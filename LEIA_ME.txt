@@ -1,0 +1,19 @@
+HOTFIX Render - gunicorn app:app
+
+Erro: Failed to find attribute 'app' in 'app'
+
+O Render está iniciando com: gunicorn app:app
+Mas o projeto usa factory create_app().
+
+Este hotfix adiciona no arquivo app/__init__.py:
+    app = create_app()
+
+COMO APLICAR:
+1) Extraia este ZIP
+2) Substitua no seu projeto:
+     app/__init__.py
+3) Commit + Push no GitHub
+4) Render: Manual Deploy (Deploy latest commit)
+
+Alternativa (melhor): mudar Start Command para:
+    gunicorn wsgi:app --bind 0.0.0.0:$PORT

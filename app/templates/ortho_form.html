@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% set title = "Manutenção ortodôntica" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">{{ "Editar manutenção" if item else "Nova manutenção ortodôntica" }}</h4>
+    <div class="text-muted small">Registra manutenção e já cria/atualiza no Financeiro (pago ou a receber)</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('ortho.list_ortho', patient_id=patient_prefill) }}">Voltar</a>
+  </div>
+</div>
+
+<form class="card shadow-sm border-0" method="post">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Paciente</label>
+        {% if item %}
+          <input class="form-control" value="{{ item.patient_name }}{% if item.patient_cpf %} ({{ item.patient_cpf }}){% endif %}" disabled>
+        {% else %}
+          <input id="patient_filter" class="form-control mb-2" placeholder="Buscar paciente por nome ou CPF..." autocomplete="off">
+          <select id="patient_id" class="form-select" name="patient_id" required>
+            <option value="">Selecione...</option>
+            {% for p in patients %}
+              <option value="{{ p.id }}" {% if patient_prefill|int == p.id %}selected{% endif %}>{{ p.name }}{% if p.cpf %} ({{ p.cpf }}){% endif %}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Dica: digite parte do nome ou CPF e a lista vai filtrando.</div>
+        {% endif %}
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Data da manutenção</label>
+        <input class="form-control" type="date" name="maintenance_date" value="{{ item.maintenance_date if item else '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Dentista</label>
+        <select class="form-select" name="provider_id">
+          <option value="">—</option>
+          {% for pr in providers %}
+            <option value="{{ pr.id }}" {% if item and item.provider_id == pr.id %}selected{% endif %}>{{ pr.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Manutenção realizada</label>
+        <textarea class="form-control" name="maintenance_done" rows="3" placeholder="Ex.: troca de arco, ajuste de bráquetes, elástico, limpeza...">{{ item.maintenance_done if item else '' }}</textarea>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Valor (R$)</label>
+        <input class="form-control money" name="amount" value="{% if item %}{{ cents_to_brl(item.amount_cents) }}{% endif %}" placeholder="0,00">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Status do pagamento</label>
+        <select class="form-select" name="payment_status" id="payment_status">
+          <option value="paid" {% if item and item.payment_status=='paid' %}selected{% endif %}>Pago</option>
+          <option value="pending" {% if not item or item.payment_status=='pending' %}selected{% endif %}>Vai pagar outro dia (A receber)</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Método</label>
+        <select class="form-select" name="payment_method">
+          {% for k, label in pm %}
+            <option value="{{ k }}" {% if item and item.payment_method==k %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3" id="wrap_paid_at">
+        <label class="form-label">Pago em</label>
+        <input class="form-control" type="date" name="paid_at" value="{{ item.paid_at if item else '' }}">
+      </div>
+
+      <div class="col-md-3 d-none" id="wrap_due_date">
+        <label class="form-label">Vai pagar em</label>
+        <input class="form-control" type="date" name="due_date" value="{{ item.due_date if item else '' }}">
+      </div>
+
+      <hr class="my-2">
+
+      <div class="col-12">
+        <h6 class="mb-2">Próxima manutenção</h6>
+        <div class="text-muted small">Você pode só registrar aqui, ou já criar na Agenda (30 min por padrão).</div>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Data</label>
+        <input class="form-control" type="date" name="next_date" value="{{ item.next_date if item else '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Horário</label>
+        <input class="form-control" type="time" name="next_time" value="{{ item.next_time if item else '' }}">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Obs (opcional)</label>
+        <input class="form-control" name="next_note" value="{{ item.next_note if item else '' }}" placeholder="Ex.: retornar em 30 dias / levar elásticos...">
+      </div>
+
+      {% if not item %}
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="1" id="create_in_agenda" name="create_in_agenda" checked>
+          <label class="form-check-label" for="create_in_agenda">
+            Criar automaticamente na Agenda
+          </label>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-muted small">
+        {% if item.appointment_id %}
+          Já existe um agendamento criado (ID {{ item.appointment_id }}). Se quiser mudar horário/data, edite na Agenda.
+        {% endif %}
+        {% if item.finance_tx_id %}
+          Lançamento no Financeiro vinculado (ID {{ item.finance_tx_id }}).
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="col-12 d-flex justify-content-end gap-2">
+        <button class="btn btn-brand">Salvar</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function togglePayFields() {
+    const st = document.getElementById("payment_status").value;
+    const paidWrap = document.getElementById("wrap_paid_at");
+    const dueWrap = document.getElementById("wrap_due_date");
+    if (st === "paid") {
+      paidWrap.classList.remove("d-none");
+      dueWrap.classList.add("d-none");
+    } else {
+      paidWrap.classList.add("d-none");
+      dueWrap.classList.remove("d-none");
+    }
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    togglePayFields();
+    document.getElementById("payment_status").addEventListener("change", togglePayFields);
+
+    // Busca rápida de paciente (filtra o <select> conforme digita)
+    const patientFilter = document.getElementById("patient_filter");
+    const patientSelect = document.getElementById("patient_id");
+    if (patientFilter && patientSelect) {
+      const options = Array.from(patientSelect.options).map(o => ({ o, t: (o.text || "").toLowerCase() }));
+
+      function applyPatientFilter() {
+        const q = (patientFilter.value || "").trim().toLowerCase();
+        let visibleCount = 0;
+        let firstVisible = "";
+
+        for (const it of options) {
+          if (!it.o.value) {
+            it.o.hidden = false;
+            continue;
+          }
+          const show = (!q) || it.t.includes(q);
+          it.o.hidden = !show;
+          if (show) {
+            visibleCount += 1;
+            if (!firstVisible) firstVisible = it.o.value;
+          }
+        }
+
+        // Se o selecionado ficou oculto (não bate com a busca), limpa a seleção
+        const selOpt = patientSelect.options[patientSelect.selectedIndex];
+        if (patientSelect.value && selOpt && selOpt.hidden) {
+          patientSelect.value = "";
+        }
+
+        // Se sobrar só 1 opção, seleciona automaticamente
+        if (q && visibleCount === 1 && firstVisible) {
+          patientSelect.value = firstVisible;
+        }
+      }
+
+      patientFilter.addEventListener("input", applyPatientFilter);
+      applyPatientFilter();
+    }
+  });
+</script>
+{% endblock %}

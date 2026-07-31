@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set title = "Aniversários" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Aniversários</h4>
+    <div class="text-muted small">Lembretes (WhatsApp) com mensagem pronta.</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-2">🎂 Aniversariantes de hoje</h6>
+        {% if todays %}
+          <div class="list-group">
+            {% for p in todays %}
+              <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                  <div>
+                    <div class="fw-semibold">{{ p.name }}</div>
+                    <div class="text-muted small">
+                      Nascimento: {{ p.birth_date }} {% if p.phone %} • Tel: {{ p.phone }}{% endif %}
+                      {% if p.sent %}<span class="badge text-bg-success ms-2">Enviado</span>{% endif %}
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('patients.view_patient', pid=p.id) }}">Abrir paciente</a>
+                    {% if p.wa_link %}
+                      <a class="btn btn-sm btn-brand" target="_blank" href="{{ p.wa_link }}">Abrir WhatsApp</a>
+                      <button class="btn btn-sm btn-outline-success" onclick="markSent({{ p.id }}, '{{ today }}', {{ p.message|tojson }})">Marcar como enviado</button>
+                    {% else %}
+                      <span class="text-muted small align-self-center">Sem número</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="mt-2 small bg-light border rounded-3 p-2">{{ p.message }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted">Nenhum aniversariante hoje.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-body">
+        <h6 class="mb-2">📅 Próximos 30 dias</h6>
+        {% if upcoming %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Paciente</th>
+                  <th>Data</th>
+                  <th>Em</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in upcoming %}
+                  <tr>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.next_date }}</td>
+                    <td>{{ p.days }} dia(s)</td>
+                    <td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.view_patient', pid=p.id) }}">Abrir</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">Nada nos próximos 30 dias.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-2">Mensagem padrão (WhatsApp)</h6>
+        <div class="text-muted small mb-2">
+          Você pode usar <code>{nome}</code> e <code>{clinica}</code>.
+        </div>
+        <form method="post" class="vstack gap-2">
+          <textarea class="form-control" name="birthday_template" rows="6" required>{{ birthday_template }}</textarea>
+          <button class="btn btn-brand">Salvar mensagem</button>
+        </form>
+        <hr>
+        <div class="small">
+          <div class="fw-semibold mb-1">Prévia (exemplo):</div>
+          <div class="bg-light border rounded-3 p-2">
+            {{ birthday_template.replace('{nome}','Maria').replace('{clinica}', clinic_name) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-light border mt-3 small">
+      <b>Como fica “automático”?</b><br>
+      Sempre que você abrir a <b>Home</b> no dia do aniversário, o sistema mostra um aviso.
+      Daqui você só clica em <b>Abrir WhatsApp</b>.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function markSent(patientId, sentOn, message){
+    try{
+      const res = await fetch("{{ url_for('birthdays.mark_sent') }}", {
+        method: "POST",
+        headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+        body: new URLSearchParams({patient_id: patientId, sent_on: sentOn, message: message})
+      });
+      const j = await res.json();
+      if(j.ok){
+        location.reload();
+      }else{
+        alert("Não consegui marcar como enviado.");
+      }
+    }catch(e){
+      alert("Falha ao marcar como enviado.");
+      console.error(e);
+    }
+  }
+</script>
+{% endblock %}
