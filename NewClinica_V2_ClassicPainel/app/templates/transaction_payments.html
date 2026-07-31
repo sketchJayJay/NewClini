@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set title = "Pagamentos do lançamento" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Pagamentos / Parcial</h4>
+    <div class="text-muted small">Lançamento #{{ tx.id }} · {{ tx.description or 'Sem descrição' }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('finance.transaction_edit', tid=tx.id) }}">Editar lançamento</a>
+    <a class="btn btn-light" href="{{ url_for('finance.transactions') }}">Voltar</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Valor final</div><div class="kpi-value">R$ {{ cents_to_brl(tx.final_amount_cents or tx.amount_cents) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Pago</div><div class="kpi-value text-success">R$ {{ cents_to_brl(tx.paid_amount_cents or 0) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Saldo</div><div class="kpi-value text-danger">R$ {{ cents_to_brl(tx.balance_cents or 0) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Status</div><div class="kpi-value">{% if tx.status=='paid' %}<span class="badge bg-success">Pago</span>{% else %}<span class="badge bg-warning text-dark">Pendente</span>{% endif %}</div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0"><div class="card-body p-4">
+      <h6 class="mb-3">Registrar pagamento</h6>
+      <form method="post">
+        <div class="mb-3"><label class="form-label">Valor (R$)</label><input class="form-control money" name="amount" placeholder="Ex: 100,00" required></div>
+        <div class="mb-3"><label class="form-label">Data</label><input class="form-control" type="date" name="date" value="{{ today }}"></div>
+        <div class="mb-3"><label class="form-label">Forma</label><select class="form-select" name="payment_method">{% for k,label in pm %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="mb-3"><label class="form-label">Observação</label><input class="form-control" name="notes" placeholder="Ex: Sinal, parcela, ajuste..."></div>
+        <button class="btn btn-brand w-100">Salvar pagamento</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0"><div class="table-responsive">
+      <table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Data</th><th>Forma</th><th>Obs.</th><th class="text-end">Valor</th><th style="width:100px"></th></tr></thead><tbody>
+      {% for p in payments %}
+        <tr><td>{{ p.date }}</td><td>{{ pm_labels.get(p.payment_method, p.payment_method) }}</td><td class="text-muted">{{ p.notes or '' }}</td><td class="text-end">R$ {{ cents_to_brl(p.amount_cents) }}</td><td class="text-end"><form method="post" action="{{ url_for('finance.payment_delete', pid=p.id) }}" onsubmit="return confirm('Remover pagamento?')"><button class="btn btn-sm btn-outline-danger">Remover</button></form></td></tr>
+      {% else %}<tr><td colspan="5" class="text-center text-muted py-4">Nenhum pagamento registrado.</td></tr>{% endfor %}
+      </tbody></table>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

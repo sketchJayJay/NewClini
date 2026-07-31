@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ doc.title }}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:Arial, Helvetica, sans-serif; color:#111; margin:0; background:#f4f6f8}
+    .page{width:210mm; min-height:297mm; margin:0 auto; background:white; padding:16mm; position:relative}
+    .header{display:flex; justify-content:space-between; gap:20px; align-items:flex-start; border-bottom:2px solid #111; padding-bottom:12px; margin-bottom:18px}
+    .clinic h2{margin:0 0 6px; font-size:22px}
+    .muted{color:#555; font-size:12px; line-height:1.4}
+    .badge{border:1px solid #111; padding:6px 10px; border-radius:999px; font-size:12px; white-space:nowrap}
+    h1{font-size:20px; margin:18px 0 12px; text-align:center; text-transform:uppercase}
+    .patient{border:1px solid #ddd; border-radius:10px; padding:10px 12px; margin-bottom:16px; font-size:13px; line-height:1.55}
+    .content{white-space:pre-wrap; font-size:13.5px; line-height:1.55; text-align:justify}
+    .signatures{margin-top:34px; display:grid; grid-template-columns:1fr 1fr; gap:20px}
+    .sig-box{min-height:120px; text-align:center; padding-top:10px}
+    .sig-img{max-width:90%; max-height:80px; display:block; margin:0 auto 6px}
+    .line{border-top:1px solid #111; padding-top:6px; font-size:12px; min-height:26px}
+    .signed-meta{font-size:11px; color:#555; margin-top:4px}
+    .actions{position:fixed; right:16px; top:16px}
+    .btn{border:0; border-radius:8px; padding:10px 14px; background:#111; color:white; cursor:pointer}
+    @media print{body{background:white}.page{margin:0; width:auto; min-height:auto; padding:12mm}.actions{display:none}}
+  </style>
+</head>
+<body>
+  <div class="actions"><button class="btn" onclick="window.print()">Imprimir</button></div>
+  <main class="page">
+    <header class="header">
+      <div class="clinic">
+        <h2>{{ CLINIC_NAME or 'NewClínica Odonto' }}</h2>
+        <div class="muted">
+          {% if CLINIC_CNPJ %}CNPJ: {{ CLINIC_CNPJ }}<br>{% endif %}
+          {% if CLINIC_PHONE %}Telefone: {{ CLINIC_PHONE }}<br>{% endif %}
+          {% if CLINIC_ADDRESS %}Endereço: {{ CLINIC_ADDRESS }}<br>{% endif %}
+          {% if CLINIC_EMAIL %}E-mail: {{ CLINIC_EMAIL }}{% endif %}
+        </div>
+      </div>
+      <div class="badge">{{ doc_type_label(doc.doc_type) }}</div>
+    </header>
+
+    <h1>{{ doc.title }}</h1>
+
+    <section class="patient">
+      <b>Paciente:</b> {{ patient.name }}<br>
+      <b>CPF/CNPJ:</b> {{ patient.cpf or '—' }}<br>
+      <b>Telefone:</b> {{ patient.phone or '—' }}<br>
+      <b>Endereço:</b> {{ patient.address or '—' }}<br>
+      {% if doc.responsible %}<b>Profissional responsável:</b> {{ doc.responsible }}<br>{% endif %}
+      <b>Documento criado em:</b> {{ sql_to_br(doc.created_at) }}
+    </section>
+
+    <section class="content">{{ doc.content }}</section>
+
+    <section class="signatures">
+      <div class="sig-box">
+        {% if doc.signature_data_url %}
+          <img src="{{ doc.signature_data_url }}" class="sig-img" alt="Assinatura digital">
+        {% endif %}
+        <div class="line">{{ doc.signed_by or 'Paciente/Responsável' }}</div>
+        {% if doc.signed_at %}
+          <div class="signed-meta">Assinado digitalmente em {{ sql_to_br(doc.signed_at) }}{% if doc.signed_cpf %}<br>CPF: {{ doc.signed_cpf }}{% endif %}</div>
+        {% else %}
+          <div class="signed-meta">Assinatura manual</div>
+        {% endif %}
+      </div>
+      <div class="sig-box">
+        <div style="height:86px"></div>
+        <div class="line">{{ doc.responsible or 'Profissional responsável' }}</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

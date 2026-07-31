@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% set title = "Home" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Painel</h4>
+    <div class="text-muted small">Resumo rápido do dia e do mês</div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if stats %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('finance.transactions', status='pending') }}">Ver pendências</a>
+      <a class="btn btn-brand" href="{{ url_for('finance.transaction_new') }}">Novo lançamento</a>
+    {% else %}
+      <a class="btn btn-brand" href="{{ url_for('finance.unlock', next=url_for('finance.transactions')) }}">🔑 Desbloquear Financeiro</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('patients.list_patients') }}">Pacientes</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if todays_birthdays and todays_birthdays|length > 0 %}
+<div class="alert alert-warning border shadow-sm d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <b>🎂 Aniversário hoje:</b>
+    {% for p in todays_birthdays %}
+      <span class="badge text-bg-light border me-1">{{ p.name }}</span>
+    {% endfor %}
+    <div class="small text-muted mt-1">Clique para enviar a mensagem pelo WhatsApp (ou ver a lista completa).</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('birthdays.list_birthdays') }}">Página de aniversários</a>
+    <button class="btn btn-sm btn-brand" type="button" data-bs-toggle="modal" data-bs-target="#bdayModal">Abrir lembretes</button>
+  </div>
+</div>
+
+<div class="modal fade" id="bdayModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">🎂 Lembretes de aniversário (hoje)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group">
+          {% for p in todays_birthdays %}
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div>
+                  <div class="fw-semibold">{{ p.name }} {% if p.sent %}<span class="badge text-bg-success ms-2">Enviado</span>{% endif %}</div>
+                  <div class="text-muted small">
+                    {% if p.phone %}Tel: {{ p.phone }} • {% endif %}
+                    Nasc.: {{ p.birth_date }}
+                  </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patients.view_patient', pid=p.id) }}" target="_blank">Abrir paciente</a>
+                  {% if p.wa_link %}
+                    <a class="btn btn-sm btn-brand" href="{{ p.wa_link }}" target="_blank">WhatsApp</a>
+                    <button class="btn btn-sm btn-outline-success" onclick="markBdaySent({{ p.id }}, {{ p.message|tojson }})">Marcar enviado</button>
+                  {% else %}
+                    <span class="text-muted small align-self-center">Sem número</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="mt-2 small bg-light border rounded-3 p-2">{{ p.message }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-secondary" href="{{ url_for('birthdays.list_birthdays') }}">Ver tudo</a>
+        <button type="button" class="btn btn-brand" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="quick-access mb-4">
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+    <h6 class="mb-0">Atalhos futuristas ⚡</h6>
+    <div class="text-muted small">Acesso rápido às funções</div>
+  </div>
+
+  <div class="quick-grid">
+    <a class="quick-card" href="{{ url_for('patients.list_patients') }}">
+      <div class="quick-icon">👥</div>
+      <div class="quick-title">Pacientes</div>
+      <div class="quick-sub">Listar, buscar e abrir painel</div>
+    </a>
+
+    <a class="quick-card" href="{{ url_for('agenda.calendar_view') }}">
+      <div class="quick-icon">🗓️</div>
+      <div class="quick-title">Agenda</div>
+      <div class="quick-sub">Calendário geral (arrastar e soltar)</div>
+    </a>
+
+    <a class="quick-card" href="{{ url_for('birthdays.list_birthdays') }}">
+      <div class="quick-icon">🎂</div>
+      <div class="quick-title">Aniversários</div>
+      <div class="quick-sub">Lembretes com WhatsApp pronto</div>
+    </a>
+
+    <a class="quick-card" href="{{ url_for('patients.new_patient') }}">
+      <div class="quick-icon">🆕</div>
+      <div class="quick-title">Novo paciente</div>
+      <div class="quick-sub">Cadastrar rápido em 1 minuto</div>
+    </a>
+
+    <a class="quick-card" href="{% if finance_unlocked %}{{ url_for('finance.transactions') }}{% else %}{{ url_for('finance.unlock', next=url_for('finance.transactions')) }}{% endif %}">
+      <div class="quick-icon">💰</div>
+      <div class="quick-title">Financeiro</div>
+      <div class="quick-sub">Entradas, saídas e pendências</div>
+      {% if not finance_unlocked %}<span class="quick-badge">🔒 protegido</span>{% endif %}
+    </a>
+
+    <a class="quick-card" href="{% if finance_unlocked %}{{ url_for('finance.transaction_new', kind='income') }}{% else %}{{ url_for('finance.unlock', next=url_for('finance.transaction_new', kind='income')) }}{% endif %}">
+      <div class="quick-icon">➕</div>
+      <div class="quick-title">Nova entrada</div>
+      <div class="quick-sub">Dinheiro, Pix, Cartão, etc</div>
+    </a>
+
+    <a class="quick-card" href="{% if finance_unlocked %}{{ url_for('finance.transaction_new', kind='expense') }}{% else %}{{ url_for('finance.unlock', next=url_for('finance.transaction_new', kind='expense')) }}{% endif %}">
+      <div class="quick-icon">➖</div>
+      <div class="quick-title">Nova saída</div>
+      <div class="quick-sub">Gastos e contas do mês</div>
+    </a>
+
+    <a class="quick-card" href="{% if finance_unlocked %}{{ url_for('finance.transactions', status='pending') }}{% else %}{{ url_for('finance.unlock', next=url_for('finance.transactions', status='pending')) }}{% endif %}">
+      <div class="quick-icon">⏳</div>
+      <div class="quick-title">Pendências</div>
+      <div class="quick-sub">Receber e pagar (em aberto)</div>
+    </a>
+
+    <a class="quick-card" href="{% if finance_unlocked %}{{ url_for('finance.caixa') }}{% else %}{{ url_for('finance.unlock', next=url_for('finance.caixa')) }}{% endif %}">
+      <div class="quick-icon">🧾</div>
+      <div class="quick-title">Caixa</div>
+      <div class="quick-sub">Abrir/fechar e conferir</div>
+    </a>
+
+    <a class="quick-card" href="{% if finance_unlocked %}{{ url_for('finance.repasses') }}{% else %}{{ url_for('finance.unlock', next=url_for('finance.repasses')) }}{% endif %}">
+      <div class="quick-icon">🧑‍⚕️</div>
+      <div class="quick-title">Repasses</div>
+      <div class="quick-sub">Percentual e pagamento</div>
+    </a>
+
+    <a class="quick-card" href="{{ url_for('auth.settings') }}">
+      <div class="quick-icon">⚙️</div>
+      <div class="quick-title">Configurações</div>
+      <div class="quick-sub">Senha e ajustes do sistema</div>
+    </a>
+  </div>
+</div>
+
+{% if stats %}
+<div class="row g-3">
+  <div class="col-md-6 col-xl-3">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas hoje</div>
+        <div class="kpi-value text-success">R$ {{ stats.income_today }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Saídas hoje</div>
+        <div class="kpi-value text-danger">R$ {{ stats.expense_today }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Entradas mês</div>
+        <div class="kpi-value">R$ {{ stats.income_month }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card kpi shadow-sm border-0">
+      <div class="card-body">
+        <div class="kpi-label">Saídas mês</div>
+        <div class="kpi-value">R$ {{ stats.expense_month }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h6 class="mb-3">Alertas rápidos</h6>
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="text-muted small">Pendências de recebimento</div>
+            <div class="fs-4">R$ {{ stats.pending_receivables }}</div>
+          </div>
+          <a class="btn btn-outline-primary" href="{{ url_for('finance.transactions', kind='income', status='pending') }}">Abrir</a>
+        </div>
+        <hr>
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="text-muted small">Pendências de pagamento</div>
+            <div class="fs-4">R$ {{ stats.pending_payables }}</div>
+          </div>
+          <a class="btn btn-outline-primary" href="{{ url_for('finance.transactions', kind='expense', status='pending') }}">Abrir</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h6 class="mb-3">Caixa</h6>
+        {% if stats.cash_open %}
+          <div class="text-muted small">Caixa aberto agora</div>
+          <div class="fs-3">R$ {{ stats.cash_total }}</div>
+          <div class="mt-3">
+            <a class="btn btn-outline-secondary" href="{{ url_for('finance.caixa') }}">Ver caixa</a>
+          </div>
+        {% else %}
+          <div class="text-muted small">Caixa fechado</div>
+          <div class="fs-6">Abra o caixa para controlar entradas/saídas em dinheiro.</div>
+          <div class="mt-3">
+            <a class="btn btn-brand" href="{{ url_for('finance.caixa') }}">Abrir caixa</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card shadow-sm border-0">
+  <div class="card-body p-4">
+    <h5 class="mb-1">Financeiro protegido 🔒</h5>
+    <div class="text-muted">O resumo financeiro fica escondido na Home. Para acessar, clique em <b>Financeiro</b> e digite a senha.</div>
+    <div class="mt-3">
+      <a class="btn btn-brand" href="{{ url_for('finance.unlock', next=url_for('finance.transactions')) }}">Entrar no Financeiro</a>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function markBdaySent(patientId, message){
+    try{
+      const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD no fuso local
+      const res = await fetch("{{ url_for('birthdays.mark_sent') }}", {
+        method: "POST",
+        headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+        body: new URLSearchParams({patient_id: patientId, sent_on: today, message: message})
+      });
+      const j = await res.json();
+      if(j.ok){
+        location.reload();
+      }else{
+        alert("Não consegui marcar como enviado.");
+      }
+    }catch(e){
+      console.error(e);
+      alert("Falha ao marcar como enviado.");
+    }
+  }
+
+  // Abre o modal automaticamente 1x por dia (se existir aniversariante hoje)
+  document.addEventListener("DOMContentLoaded", () => {
+    const hasBirthdays = {{ (todays_birthdays|length) if todays_birthdays else 0 }};
+    if(!hasBirthdays) return;
+    const key = "bdayModalShown-" + new Date().toLocaleDateString('sv-SE');
+    if(localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+    const el = document.getElementById("bdayModal");
+    if(el){
+      const m = new bootstrap.Modal(el);
+      m.show();
+    }
+  });
+</script>
+{% endblock %}
