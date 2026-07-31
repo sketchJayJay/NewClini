@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% set title = "Relatórios financeiros" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div><h4 class="mb-0">Relatórios financeiros</h4><div class="text-muted small">Resumo por período, método, categoria, profissional e previsão de recebimentos</div></div>
+  <div class="d-flex gap-2"><a class="btn btn-outline-secondary" href="{{ url_for('finance.export_excel') }}">Exportar Excel</a><a class="btn btn-outline-secondary" href="{{ url_for('finance.export_pdf') }}">Exportar PDF</a></div>
+</div>
+<form class="card shadow-sm border-0 mb-3"><div class="card-body"><div class="row g-2 align-items-end"><div class="col-md-3"><label class="form-label">De</label><input class="form-control" type="date" name="from" value="{{ date_from }}"></div><div class="col-md-3"><label class="form-label">Até</label><input class="form-control" type="date" name="to" value="{{ date_to }}"></div><div class="col-md-2"><button class="btn btn-brand w-100">Atualizar</button></div><div class="col-md-2"><a class="btn btn-light w-100" href="{{ url_for('finance.reports') }}">Mês atual</a></div></div></div></form>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Entradas previstas</div><div class="kpi-value text-success">R$ {{ cents_to_brl(summary.income_total or 0) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Recebido</div><div class="kpi-value text-success">R$ {{ cents_to_brl(summary.income_paid or 0) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Saídas pagas</div><div class="kpi-value text-danger">R$ {{ cents_to_brl(summary.expense_paid or 0) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Resultado</div><div class="kpi-value">R$ {{ cents_to_brl((summary.income_paid or 0) - (summary.expense_paid or 0)) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">A receber</div><div class="kpi-value">R$ {{ cents_to_brl(summary.income_pending or 0) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi shadow-sm border-0"><div class="card-body"><div class="kpi-label">Vencidos</div><div class="kpi-value text-danger">R$ {{ cents_to_brl(summary.overdue or 0) }}</div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card shadow-sm border-0"><div class="card-body"><h6>Por forma de pagamento</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Forma</th><th class="text-end">Entradas</th><th class="text-end">Saídas</th></tr></thead><tbody>{% for r in by_method %}<tr><td>{{ pm_labels.get(r.payment_method, r.payment_method) }}</td><td class="text-end">R$ {{ cents_to_brl(r.income or 0) }}</td><td class="text-end">R$ {{ cents_to_brl(r.expense or 0) }}</td></tr>{% else %}<tr><td colspan="3" class="text-muted text-center">Sem dados.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+  <div class="col-lg-6"><div class="card shadow-sm border-0"><div class="card-body"><h6>Por categoria</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Categoria</th><th class="text-end">Entradas</th><th class="text-end">Saídas</th></tr></thead><tbody>{% for r in by_category %}<tr><td>{{ r.name }}</td><td class="text-end">R$ {{ cents_to_brl(r.income or 0) }}</td><td class="text-end">R$ {{ cents_to_brl(r.expense or 0) }}</td></tr>{% else %}<tr><td colspan="3" class="text-muted text-center">Sem dados.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+  <div class="col-lg-6"><div class="card shadow-sm border-0"><div class="card-body"><h6>Por profissional</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Profissional</th><th class="text-end">Produção</th><th class="text-end">Repasse</th></tr></thead><tbody>{% for r in by_provider %}<tr><td>{{ r.name }}</td><td class="text-end">R$ {{ cents_to_brl(r.produced or 0) }}</td><td class="text-end">R$ {{ cents_to_brl(r.repasse or 0) }}</td></tr>{% else %}<tr><td colspan="3" class="text-muted text-center">Sem dados.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+  <div class="col-lg-6"><div class="card shadow-sm border-0"><div class="card-body"><h6>Próximos 90 dias</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Venc.</th><th>Paciente</th><th>Descrição</th><th class="text-end">Saldo</th></tr></thead><tbody>{% for r in upcoming %}<tr><td>{{ r.due_date or r.date }}</td><td>{{ r.patient_name or '—' }}</td><td>{{ r.description or '' }}</td><td class="text-end">R$ {{ cents_to_brl(r.balance_cents or 0) }}</td></tr>{% else %}<tr><td colspan="4" class="text-muted text-center">Sem pendências próximas.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+</div>
+{% endblock %}

@@ -10,6 +10,17 @@ from .db import get_db
 
 bp = Blueprint("birthdays", __name__, url_prefix="/birthdays")
 
+
+
+def _safe_birthday_in_year(bd: date, year: int) -> date:
+    """Retorna a data do aniversário no ano informado, protegendo 29/02 em ano não bissexto."""
+    try:
+        return bd.replace(year=year)
+    except ValueError:
+        if bd.month == 2 and bd.day == 29:
+            return date(year, 2, 28)
+        raise
+
 def _get_setting(db, key: str, default: str = "") -> str:
     row = db.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
     return (row["value"] if row and row["value"] is not None else default)
@@ -19,21 +30,6 @@ def _render_message(template: str, nome: str, clinica: str) -> str:
 
 def _digits_phone(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
-
-def _safe_birthday_in_year(bd: date, year: int) -> date:
-    """Retorna a data do aniversário no ano informado.
-
-    Corrige o caso especial de pacientes nascidos em 29/02 quando o ano atual
-    não é bissexto. Sem isso, date.replace(year=...) estoura ValueError e
-    derruba a página de Aniversários.
-    """
-    try:
-        return bd.replace(year=year)
-    except ValueError:
-        # 29/02 em ano não bissexto: considera 28/02 para o lembrete.
-        if bd.month == 2 and bd.day == 29:
-            return date(year, 2, 28)
-        raise
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
@@ -80,7 +76,7 @@ def list_birthdays():
             continue
 
         mmdd = bd.strftime("%m-%d")
-        # Próximo aniversário (com proteção para 29/02 em ano não bissexto)
+        # Próximo aniversário (protege 29/02 em ano não bissexto)
         next_bd = _safe_birthday_in_year(bd, today.year)
         if next_bd < today:
             next_bd = _safe_birthday_in_year(bd, today.year + 1)
